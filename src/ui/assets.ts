@@ -12,6 +12,8 @@
  *                 falls back to `opengaz`. Never committed, never deployed.
  */
 
+import { procImage } from './procgen';
+
 export type PackName = 'opengaz' | 'original';
 
 interface Manifest {
@@ -174,7 +176,7 @@ function resolve(kind: 'gfx' | 'sfx', id: string): string | undefined {
   return undefined;
 }
 
-/** URL for an image id, or undefined if no pack provides it (draw a placeholder). */
-export const img = (id: string) => resolve('gfx', id);
+/** URL for an image id: from the active pack, else the fallback pack, else procedural art. */
+export const img = (id: string) => resolve('gfx', id) ?? procImage(id);
 /** URL for a sound id, or undefined. */
 export const sfx = (id: string) => resolve('sfx', id);

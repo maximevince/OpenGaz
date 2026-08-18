@@ -30,11 +30,15 @@
   import GameOver from './ui/screens/GameOver.svelte';
 
   let ready = $state(false);
-  initAssets().then(() => {
-    ready = true;
-    // play-by-link: #g=... in the URL
-    if (location.hash.startsWith('#g=')) game.importLink(location.href);
-  });
+  // ?pack=opengaz forces the shipped pack even when the dev-only original pack is present
+  const preferred = new URLSearchParams(location.search).get('pack');
+  initAssets(preferred === 'opengaz' || preferred === 'original' ? preferred : undefined).then(
+    () => {
+      ready = true;
+      // play-by-link: #g=... in the URL
+      if (location.hash.startsWith('#g=')) game.importLink(location.href);
+    },
+  );
   const screens = {
     setup: Setup,
     handoff: Handoff,
