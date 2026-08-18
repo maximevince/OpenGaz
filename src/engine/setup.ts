@@ -20,8 +20,10 @@ export interface NewGameOptions {
   /** commodities in play; omit for a random 9 */
   commodities?: CommodityId[];
   humans: { name: string; ship: number }[];
-  /** number of computer opponents 0..6 */
+  /** number of computer opponents 0..6 (random pick), ignored when `opponents` is given */
   ai: number;
+  /** explicit opponent ids (see data/opponents.ts), in seat order */
+  opponents?: string[];
   aiIq?: number;
 }
 
@@ -156,7 +158,12 @@ export function newGame(opts: NewGameOptions): GameState {
   };
 
   opts.humans.forEach((h, i) => state.companies.push(mkCompany(`h${i}`, h.name, h.ship, false)));
-  const opps = r.shuffle(OPPONENTS).slice(0, Math.max(0, Math.min(6, opts.ai)));
+  const opps = opts.opponents
+    ? opts.opponents
+        .map((id) => OPPONENTS.find((o) => o.id === id))
+        .filter((o): o is (typeof OPPONENTS)[number] => !!o)
+        .slice(0, 6)
+    : r.shuffle(OPPONENTS).slice(0, Math.max(0, Math.min(6, opts.ai)));
   opps.forEach((o) => {
     const co = mkCompany(o.id, o.name, r.int(1, 12), true);
     co.aiStyle = o.style;

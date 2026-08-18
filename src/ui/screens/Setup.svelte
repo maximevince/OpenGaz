@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { LEVELS, PLANETS, SHIPS, type Level, type PlanetId } from '../../engine';
+  import { LEVELS, OPPONENTS, PLANETS, SHIPS, type Level, type PlanetId } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
 
   let level: Level = $state('novice');
-  let ai = $state(5);
+  let opponents: string[] = $state(OPPONENTS.slice(0, 5).map((o) => o.id));
+  const ai = $derived(opponents.length);
   let humans: { name: string; ship: number }[] = $state([{ name: 'Slev & Sons', ship: 1 }]);
   let planets: PlanetId[] = $state(randomPlanets());
   let seed = $state(String(Date.now() % 1000000));
@@ -33,6 +34,7 @@
       planets,
       humans: humans.map((h) => ({ name: h.name.trim(), ship: h.ship })),
       ai,
+      opponents,
     });
   }
 </script>
@@ -62,14 +64,23 @@
             { name: `Player ${humans.length + 1}`, ship: 1 + (humans.length % 12) },
           ])}>+ add human</Btn
       >
-      <label class="line"
-        >Computer opponents: <input
-          type="number"
-          min="0"
-          max={7 - humans.length}
-          bind:value={ai}
-        /></label
-      >
+      <h3>Computer opponents ({ai})</h3>
+      <div class="opps">
+        {#each OPPONENTS as o, i (o.id)}
+          {@const on = opponents.includes(o.id)}
+          <button
+            class="opp"
+            class:on
+            title={o.blurb}
+            disabled={!on && humans.length + ai >= 7}
+            onclick={() =>
+              (opponents = on ? opponents.filter((x) => x !== o.id) : [...opponents, o.id])}
+          >
+            <img src={img(`portrait.op${i + 1}`)} alt="" />
+            <span>{o.name}</span>
+          </button>
+        {/each}
+      </div>
       <label class="line"
         >Level:
         <select bind:value={level}
@@ -192,9 +203,6 @@
     background: #fff;
     color: #000;
   }
-  input[type='number'] {
-    width: 50px;
-  }
   .seed {
     width: 100px;
   }
@@ -236,6 +244,38 @@
   .pl.on {
     background: var(--c-yellow-plate);
     border-color: #000;
+  }
+  .opps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .opp {
+    color: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font: bold 10px var(--font-ui);
+    background: #fff;
+    border: 2px solid #808080;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.85;
+  }
+  .opp img {
+    width: 64px;
+    height: 40px;
+    object-fit: cover;
+  }
+  .opp.on {
+    background: var(--c-yellow-plate);
+    border-color: #000;
+    opacity: 1;
+  }
+  .opp:disabled {
+    cursor: default;
+    opacity: 0.35;
   }
   .buttons {
     display: flex;
