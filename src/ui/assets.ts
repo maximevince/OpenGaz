@@ -25,6 +25,8 @@ interface Pack {
   name: PackName;
   base: string;
   manifest: Manifest;
+  /** sound file extension used by this pack */
+  sfxExt: 'ogg' | 'wav';
   /** map semantic id -> file stem within the pack (without extension) */
   gfxId(id: string): string | undefined;
   sfxId(id: string): string | undefined;
@@ -136,6 +138,7 @@ export async function initAssets(preferred?: PackName): Promise<PackName> {
     name: 'opengaz',
     base: `${BASE}/assets`,
     manifest: og,
+    sfxExt: 'ogg',
     gfxId: opengazGfx,
     sfxId: anySfx,
   };
@@ -147,6 +150,7 @@ export async function initAssets(preferred?: PackName): Promise<PackName> {
         name: 'original',
         base: `${BASE}/original`,
         manifest: orig,
+        sfxExt: 'wav',
         gfxId: originalGfx,
         sfxId: anySfx,
       };
@@ -170,7 +174,7 @@ function resolve(kind: 'gfx' | 'sfx', id: string): string | undefined {
     if (!pack) continue;
     const stem = kind === 'gfx' ? pack.gfxId(id) : pack.sfxId(id);
     if (stem && pack.manifest[kind].includes(stem)) {
-      return `${pack.base}/${kind}/${stem}.${kind === 'gfx' ? 'png' : 'wav'}`;
+      return `${pack.base}/${kind}/${stem}.${kind === 'gfx' ? 'png' : pack.sfxExt}`;
     }
   }
   return undefined;

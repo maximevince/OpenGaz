@@ -2,6 +2,7 @@
   import { PLANET_BY_ID, cargoTons, passengersWaiting } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
+  import SoundToggle from '../components/SoundToggle.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
 
@@ -65,6 +66,7 @@
     </div>
     <button class="help" onclick={() => game.help('menu')} title="Help">👆<br />Help</button>
     <div class="status">wk {game.s.week} · {cargoTons(co)}/{co.ship.cargo} t</div>
+    <SoundToggle />
   </div>
 </div>
 

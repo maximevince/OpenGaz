@@ -3,6 +3,7 @@
  * and decides which screen is showing. All rules live in src/engine — this file only glues.
  */
 import { online } from '../net/online.svelte';
+import { play } from './sound';
 import {
   ActionError,
   applyAction,
@@ -50,6 +51,27 @@ export type Screen =
   | 'gameover';
 
 const AUTOSAVE_KEY = 'opengaz.autosave';
+/** feedback sound per successful action (ids from src/ui/sound.ts) */
+const ACTION_SOUND: Partial<Record<Action['type'], string>> = {
+  buy: 'buy',
+  sell: 'sell',
+  store: 'buy',
+  retrieve: 'sell',
+  stockBuy: 'buy',
+  stockSell: 'sell',
+  buyFuel: 'buy',
+  buyInsurance: 'coins',
+  payCrew: 'coins',
+  payTaxes: 'coins',
+  bankDeposit: 'coins',
+  bankWithdraw: 'coins',
+  unionBorrow: 'cash',
+  unionRepay: 'coins',
+  zinnRepay: 'coins',
+  pickupPassengers: 'coins',
+  advertise: 'coins',
+  journey: 'rocket',
+};
 const SLOT_KEY = (n: number) => `opengaz.save.${n}`;
 
 class GameStore {
@@ -142,8 +164,10 @@ class GameStore {
       this.error = null;
     } catch (e) {
       this.error = e instanceof ActionError ? e.message : String(e);
+      play('error');
       return false;
     }
+    play(ACTION_SOUND[a.type] ?? '');
     if (online.active) online.broadcastAction(a, this.state);
     this.afterChange();
     return true;
@@ -155,6 +179,7 @@ class GameStore {
     if (s.phase === 'gameOver') {
       this.state = s;
       this.screen = 'gameover';
+      play(s.winner !== null && !s.companies[s.winner]!.isAI ? 'win' : 'lose');
       this.autosave();
       return;
     }
@@ -166,11 +191,13 @@ class GameStore {
       return;
     }
     if (s.phase === 'event') {
+      if (this.screen !== 'event') play(`event.${s.pending?.mood ?? 'neutral'}`);
       this.screen = 'event';
       this.autosave();
       return;
     }
     if (s.phase === 'arrival' && !isAiTurn(s)) {
+      if (this.screen !== 'arrival') play('arrive');
       this.screen = 'arrival';
       this.autosave();
       return;

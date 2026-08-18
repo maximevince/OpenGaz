@@ -177,7 +177,7 @@ The UI resolves images/sounds through an **asset pack** abstraction:
 - [x] M3 parity: 14 planet specials, ~45 travel events, auctions (facilities, ship upgrades),
       warehouse lottery, tax audits, help texts, weather, histories
 - [x] M4 hot-seat + play-by-link
-- [~] M5 assets: procedural SVG placeholders shipped; real recreated art/sound still to do
+- [~] M5 assets: procedural SVG placeholders + ZzFX synth sounds shipped; recreated art/sound pipeline and prompt sheets in `docs/ASSETS.md`, images still to generate
   (`assets/` + `SOURCES.md`); no sound yet
 - [x] M6a online P2P rooms (Trystero) — `src/net/online.svelte.ts`
 - [ ] M6b optional hosted rooms (Cloudflare Worker + Durable Object) for async turns

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Btn from '../components/Btn.svelte';
+  import SoundToggle from '../components/SoundToggle.svelte';
   import { game } from '../game.svelte';
   import { online } from '../../net/online.svelte';
   let link = $state('');
@@ -61,6 +62,7 @@
     </div>
   </div>
   <div class="buttons">
+    <SoundToggle />
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
     <Btn
       onclick={() => {

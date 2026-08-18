@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { play } from '../sound';
   let {
     children,
     onclick,
@@ -17,7 +18,16 @@
   } = $props();
 </script>
 
-<button class="btn {color}" {onclick} {disabled} {style} {title}>
+<button
+  class="btn {color}"
+  onclick={() => {
+    play('click');
+    onclick?.();
+  }}
+  {disabled}
+  {style}
+  {title}
+>
   {@render children()}
 </button>
 

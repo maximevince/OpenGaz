@@ -2,6 +2,7 @@
   import { activePack, img } from '../assets';
   import { BUILD } from '../build';
   import Btn from '../components/Btn.svelte';
+  import SoundToggle from '../components/SoundToggle.svelte';
   import { game } from '../game.svelte';
   const bg = img('screen.title');
   const pack = activePack();
@@ -26,7 +27,7 @@
       disabled={!game.state}>File Options</Btn
     >
   </div>
-  <div class="pack">OpenGaz {BUILD} · asset pack: {pack}</div>
+  <div class="pack"><SoundToggle /> OpenGaz {BUILD} · asset pack: {pack}</div>
 </div>
 
 <style>

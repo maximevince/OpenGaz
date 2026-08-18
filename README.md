@@ -56,6 +56,7 @@ pnpm test         # engine unit tests (vitest)
 pnpm check        # svelte-check + tsc
 pnpm lint         # eslint + prettier
 pnpm build        # static site in dist/
+pnpm assets:build # assets/src masters -> public/assets pack (see docs/ASSETS.md)
 ```
 
 Stack: TypeScript, Vite, Svelte 5, Vitest. Layout:
@@ -64,7 +65,7 @@ Stack: TypeScript, Vite, Svelte 5, Vitest. Layout:
 src/engine/   pure, deterministic game rules (no DOM) — data tables, reducer, AI, save/load
 src/ui/       Svelte screens on a 640×480 virtual stage
 src/net/      transports: local hot-seat, play-by-link, P2P (Trystero) …
-assets/       recreated art & sound (GPL) + SOURCES.md
+assets/       recreated art & sound masters, prompt sheets, SOURCES.md (see docs/ASSETS.md)
 docs/         design reference
 ```
 
