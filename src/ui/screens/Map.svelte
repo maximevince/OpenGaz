@@ -53,7 +53,7 @@
   <div class="buttons">
     <Btn color="black" onclick={() => game.go('menu')}>Return to Main Menu</Btn>
     <Btn color="black" onclick={() => game.go('supply')}>Supply Chart</Btn>
-    <Btn color="black" onclick={() => game.go('menu')}>Help</Btn>
+    <Btn color="black" onclick={() => game.help()}>Help</Btn>
   </div>
 
   {#if confirm !== null}

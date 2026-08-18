@@ -43,7 +43,7 @@
       onclick={() => game.dispatch({ type: 'unionRepay', amount: Math.min(co.cash, co.unionLoan) })}
       disabled={co.unionLoan <= 0 || co.cash <= 0}>Pay Back Max</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>
 

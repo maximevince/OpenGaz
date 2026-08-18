@@ -26,6 +26,6 @@
       onclick={() => game.dispatch({ type: 'payTaxes' })}
       disabled={total <= 0 || co.cash < total}>Pay All Taxes</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>

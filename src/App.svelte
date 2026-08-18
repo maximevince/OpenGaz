@@ -1,6 +1,7 @@
 <script lang="ts">
   import Stage from './ui/Stage.svelte';
   import Toast from './ui/components/Toast.svelte';
+  import HelpDialog from './ui/components/HelpDialog.svelte';
   import { initAssets } from './ui/assets';
   import { game } from './ui/game.svelte';
   import Title from './ui/screens/Title.svelte';
@@ -73,6 +74,10 @@
   {:else if Current}
     <Current />
   {/if}
+  {#if game.state?.pending && game.state.phase !== 'event' && game.screen !== 'event' && game.screen !== 'title'}
+    <Event />
+  {/if}
+  <HelpDialog />
   <Toast />
 </Stage>
 

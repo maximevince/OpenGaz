@@ -56,6 +56,7 @@ export function newGame(opts: NewGameOptions): GameState {
     phase: 'onPlanet',
     destination: null,
     pending: null,
+    auction: null,
     arrivalReports: [],
     log: [],
     winner: null,
@@ -143,6 +144,8 @@ export function newGame(opts: NewGameOptions): GameState {
       blessed: false,
       bankrupt: false,
       netWorthHistory: [],
+      inbox: [],
+      mods: { insurance: 1, fuelDiscount: 0, blessedWeeks: 0, upgrades: 0, specialWeek: 0 },
       visitProfit: 0,
       visitBought: {},
     };

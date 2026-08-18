@@ -72,7 +72,7 @@
   <div class="buttons">
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
     <Btn onclick={() => game.go('market')}>Marketplace</Btn>
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

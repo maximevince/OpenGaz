@@ -95,7 +95,7 @@
     <Btn onclick={() => (view = (pi + 1) % s.planets.length)}>Show Next</Btn>
     <Btn onclick={() => (view = -1)}>Show Local</Btn>
     <Btn onclick={() => game.go('money')}>Show Shares</Btn>
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

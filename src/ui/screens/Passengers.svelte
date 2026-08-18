@@ -40,7 +40,7 @@
     >
     <Btn onclick={() => (prompt = true)}>Set TICKET PRICE</Btn>
     <Btn onclick={() => game.go('advertise')}>Advertise</Btn>
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

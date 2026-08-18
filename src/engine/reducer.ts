@@ -21,6 +21,8 @@ import {
 } from './economy';
 import { Rng } from './rng';
 import { resolveEventChoice, rollTravelEvents } from './events';
+import { resolveSpecialChoice, startSpecial } from './specials';
+import { maybeStartAuction, promptBid, recordBid, settleAuction } from './auctions';
 import {
   ActionError,
   type Action,
@@ -97,8 +99,9 @@ export function applyAction(input: GameState, action: Action): GameState {
 function dispatch(state: GameState, a: Action, r: Rng): void {
   need(state.phase !== 'gameOver', 'game is over');
   if (a.type === 'continue') return doContinue(state, r);
-  if (a.type === 'eventChoice') return doEventChoice(state, a.choice, r);
+  if (a.type === 'eventChoice') return doEventChoice(state, a.choice, a.amount, r);
   need(state.phase === 'onPlanet', `cannot ${a.type} now (${state.phase})`);
+  need(!state.pending, 'answer the open dialog first');
   const co = currentCompany(state);
   const p = state.planets[co.planet]!;
   const pi = co.planet;
@@ -260,10 +263,11 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
     case 'buyFuel': {
       const tons = Math.min(posInt(a.tons, 'tons'), co.ship.fuelCap - co.ship.fuel);
       need(tons > 0, 'tank is full');
-      const cost = tons * p.fuelPrice;
+      const cost = Math.round(tons * p.fuelPrice * (1 - co.mods.fuelDiscount));
       need(cost <= co.cash, 'not enough cash');
       co.cash -= cost;
       co.ship.fuel += tons;
+      co.mods.fuelDiscount = 0;
       return;
     }
     case 'stockBuy': {
@@ -291,6 +295,8 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
       if (lot!.tons === 0) delete co.shares[pi];
       return;
     }
+    case 'special':
+      return startSpecial(state, co, currentIndex(state), r);
     case 'journey':
       need(Number.isInteger(a.to) && a.to >= 0 && a.to < state.planets.length, 'bad destination');
       need(a.to !== co.planet, 'you are already there');
@@ -348,6 +354,8 @@ function doJourney(state: GameState, co: CompanyState, to: number, r: Rng): void
   else co.weeksTaxUnpaid = 0;
   co.visitProfit = 0;
   co.visitBought = {};
+  co.mods.fuelDiscount = 0;
+  if (co.mods.blessedWeeks > 0 && --co.mods.blessedWeeks === 0) co.luck = 0.5;
 
   // --- fuel ---
   const used = fuelUsage(dist, shipTons(co), r);
@@ -390,6 +398,10 @@ export function arrive(state: GameState, r: Rng): void {
   const pname = PLANET_BY_ID[p.id].name;
   co.planet = to;
   state.destination = null;
+  if (co.inbox.length) {
+    state.arrivalReports.push(...co.inbox);
+    co.inbox = [];
+  }
 
   // passengers pay on arrival (taxed)
   if (co.passengers > 0) {
@@ -453,15 +465,21 @@ export function arrive(state: GameState, r: Rng): void {
 
 /* --------------------------------------------------------------- events */
 
-function doEventChoice(state: GameState, choice: string, r: Rng): void {
-  need(state.phase === 'event' && state.pending, 'no event pending');
+function doEventChoice(state: GameState, choice: string, amount: number | undefined, r: Rng): void {
+  need(state.pending, 'no event pending');
   const ev = state.pending!;
   const valid = ev.choices.length === 0 ? choice === 'ok' : ev.choices.some((c) => c.id === choice);
   need(valid, 'invalid choice');
   state.pending = null;
-  state.phase = 'travel';
   const co = currentCompany(state);
-  // event resolution hook (M3 will route by ev.id); default: continue travelling
+  if (ev.context === 'planet') {
+    if (ev.id === 'auctionbid') recordBid(state, currentIndex(state), choice, amount);
+    else resolveSpecialChoice(state, co, currentIndex(state), ev.id, choice, ev.data ?? {}, r);
+    if (!state.pending) promptBid(state, currentIndex(state));
+    return; // stay on the planet
+  }
+  need(state.phase === 'event', 'no travel event pending');
+  state.phase = 'travel';
   resolveEventChoice(state, co, ev.id, choice, ev.data ?? {}, r);
   if ((state.phase as Phase) === 'event') return; // chained event
   arrive(state, r);
@@ -481,7 +499,17 @@ function doContinue(state: GameState, r: Rng): void {
     state.turnIndex++;
   }
   if (state.turnIndex >= state.order.length) endWeek(state, r);
-  else state.phase = 'onPlanet';
+  else {
+    state.phase = 'onPlanet';
+    enterTurn(state);
+  }
+}
+
+/** A company's turn begins: pending auction bid prompt for humans. */
+function enterTurn(state: GameState): void {
+  const ci = currentIndex(state);
+  const co = state.companies[ci];
+  if (co && !co.isAI) promptBid(state, ci);
 }
 
 function endWeek(state: GameState, r: Rng): void {
@@ -508,8 +536,10 @@ function endWeek(state: GameState, r: Rng): void {
     stepExchange(p, r);
   }
 
-  // --- weekly economic roll ---
+  // --- weekly economic roll, auctions ---
   weeklyEconomy(state, r);
+  settleAuction(state);
+  maybeStartAuction(state, r);
 
   // --- companies: bankruptcy, net worth, win ---
   for (let i = 0; i < state.companies.length; i++) {
@@ -526,6 +556,21 @@ function endWeek(state: GameState, r: Rng): void {
     } else if (co.zinnLoan > co.zinnLimit) {
       co.bankrupt = true;
       log(state, -1, 'news', `Mr. Zinn repossessed ${co.name}'s ship. ${co.name} is BANKRUPT.`);
+    }
+    // tax audit after 3 weeks of arrears
+    const owed = co.taxOwedPassenger + co.taxOwedTariff;
+    if (owed > 0 && co.weeksTaxUnpaid >= 3) {
+      const fine = Math.round(owed * 0.25);
+      forcePay(state, co, owed + fine, 'the tax audit');
+      co.taxOwedPassenger = 0;
+      co.taxOwedTariff = 0;
+      co.weeksTaxUnpaid = 0;
+      co.inbox.push({
+        week: state.week,
+        company: i,
+        kind: 'bad',
+        text: `The Imperial Tax Auditor caught up with you: ${fmt(owed)} kubars in overdue taxes collected, plus a ${fmt(fine)} kubar fine.`,
+      });
     }
     co.netWorthHistory.push(netWorth(state, co));
     if (co.netWorthHistory.length > 60) co.netWorthHistory.shift();
@@ -557,6 +602,7 @@ function endWeek(state: GameState, r: Rng): void {
     });
   state.turnIndex = 0;
   state.phase = 'onPlanet';
+  enterTurn(state);
 }
 
 function stepExchange(p: { exchange: GameState['planets'][number]['exchange'] }, r: Rng): void {

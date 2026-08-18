@@ -63,6 +63,7 @@
       <div class="fill" style:height={`${Math.round(fuelPct * 100)}%`}></div>
       <span class="gauge-label">Fuel Tank</span>
     </div>
+    <button class="help" onclick={() => game.help('menu')} title="Help">👆<br />Help</button>
     <div class="status">wk {game.s.week} · {cargoTons(co)}/{co.ship.cargo} t</div>
   </div>
 </div>
@@ -201,6 +202,15 @@
     text-align: center;
     font: bold 10px var(--font-ui);
     color: #000;
+  }
+  .help {
+    width: 100%;
+    font: bold 11px var(--font-ui);
+    background: var(--c-face);
+    border: 2px solid;
+    border-color: #fff #404040 #404040 #fff;
+    cursor: pointer;
+    padding: 4px 0;
   }
   .status {
     font: 10px var(--font-ui);

@@ -33,7 +33,7 @@
     <Btn onclick={() => game.dispatch({ type: 'zinnRepay', amount: maxPay })} disabled={maxPay <= 0}
       >Pay Back Max</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>
 

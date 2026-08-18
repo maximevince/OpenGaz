@@ -31,7 +31,7 @@
       onclick={() => game.dispatch({ type: 'bankWithdraw', amount: co.bank })}
       disabled={co.bank <= 0}>Withdraw All</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>
 

@@ -53,6 +53,8 @@ class GameStore {
   state = $state.raw<GameState | null>(null);
   screen = $state<Screen>('title');
   error = $state<string | null>(null);
+  /** which screen's help dialog is open */
+  helpFor = $state<Screen | null>(null);
   /** company index the UI is currently showing (for hot-seat handoff detection) */
   private shownCompany = -1;
 
@@ -73,6 +75,10 @@ class GameStore {
   go(screen: Screen) {
     this.error = null;
     this.screen = screen;
+  }
+
+  help(screen?: Screen) {
+    this.helpFor = screen ?? this.screen;
   }
 
   start(opts: NewGameOptions) {
@@ -152,7 +158,14 @@ class GameStore {
     }
   }
   hasAutosave(): boolean {
-    return !!localStorage.getItem(AUTOSAVE_KEY);
+    const j = localStorage.getItem(AUTOSAVE_KEY);
+    if (!j) return false;
+    try {
+      deserialize(j);
+      return true;
+    } catch {
+      return false;
+    }
   }
   loadAutosave(): boolean {
     const j = localStorage.getItem(AUTOSAVE_KEY);

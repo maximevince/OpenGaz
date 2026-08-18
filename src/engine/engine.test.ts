@@ -181,3 +181,100 @@ describe('save', () => {
     expect(JSON.stringify(decodeFromLink(link))).toBe(JSON.stringify(s));
   });
 });
+
+describe('M3: specials, events, auctions', () => {
+  it('every travel event applies without throwing and leaves finite money', async () => {
+    const { EVENTS } = await import('./events');
+    const { Rng } = await import('./rng');
+    for (const ev of EVENTS) {
+      for (let seed = 0; seed < 5; seed++) {
+        let s = base();
+        // give the company some cargo and cash to work with
+        s = applyAction(s, { type: 'buy', commodity: s.commodities[0]!, tons: 5 });
+        const st = structuredClone(s);
+        const co = currentCompany(st);
+        const r = new Rng(seed);
+        const ctx = {
+          state: st,
+          co,
+          ci: 0,
+          from: co.planet,
+          to: (co.planet + 1) % 7,
+          dest: 'X',
+          r,
+          report: () => {},
+          loss: () => '',
+          ask: (e: unknown) => {
+            st.pending = { ...(e as object), context: 'travel' } as never;
+          },
+        };
+        st.destination = ctx.to;
+        expect(() => ev.apply(ctx)).not.toThrow();
+        expect(Number.isFinite(co.cash)).toBe(true);
+      }
+    }
+  });
+
+  it('planet special posts a dialog and resolves back to the menu', () => {
+    let s = base();
+    s = applyAction(s, { type: 'special' });
+    expect(s.pending).not.toBeNull();
+    expect(s.pending!.context).toBe('planet');
+    expect(() => applyAction(s, { type: 'buy', commodity: s.commodities[0]!, tons: 1 })).toThrow(
+      ActionError,
+    );
+    const choice = s.pending!.choices[0]?.id ?? 'ok';
+    s = applyAction(s, { type: 'eventChoice', choice });
+    // may chain one more notice
+    while (s.pending)
+      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+    expect(s.phase).toBe('onPlanet');
+    expect(() => applyAction(s, { type: 'special' })).toThrow(ActionError); // once per visit
+  });
+
+  it('auction: human bid prompt appears, highest bid wins a facility', async () => {
+    const { settleAuction } = await import('./auctions');
+    let s = newGame({
+      seed: 'auction',
+      level: 'novice',
+      humans: [
+        { name: 'A', ship: 1 },
+        { name: 'B', ship: 2 },
+      ],
+      ai: 0,
+    });
+    s.week = 12;
+    s.auction = {
+      kind: 'facility',
+      name: 'Launch Pad on X',
+      planet: 0,
+      fee: 3000,
+      reserve: 20000,
+      bids: {},
+      waiting: [0, 1],
+    };
+    // simulate turn entry for company 0
+    const { promptBid } = await import('./auctions');
+    promptBid(s, 0);
+    expect(s.pending?.id).toBe('auctionbid');
+    s = applyAction(s, { type: 'eventChoice', choice: 'bid', amount: 25000 });
+    expect(s.auction!.bids[0]).toBe(25000);
+    expect(s.pending).toBeNull();
+    s.auction!.bids[1] = 30000;
+    s.auction!.waiting = [];
+    settleAuction(s);
+    expect(s.auction).toBeNull();
+    expect(s.planets[0]!.facilities).toHaveLength(1);
+    expect(s.planets[0]!.facilities[0]!.owner).toBe(1);
+    expect(s.companies[1]!.cash).toBe(50000 - 30000);
+  });
+
+  it('long AI-only games stay healthy with the full catalogue', () => {
+    let s: GameState = newGame({ seed: 'full-catalogue', level: 'novice', humans: [], ai: 6 });
+    let guard = 0;
+    while (s.phase !== 'gameOver' && guard++ < 400) s = runAi(s);
+    expect(s.phase).toBe('gameOver');
+    for (const c of s.companies)
+      expect(Number.isFinite(c.cash) && Number.isFinite(c.zinnLoan)).toBe(true);
+  });
+});

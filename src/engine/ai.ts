@@ -3,6 +3,7 @@
  * deterministic and replayable. Personality = style + iq (0..1).
  */
 import type { CommodityId } from './data/commodities';
+import { PLANET_BY_ID } from './data/planets';
 import { cargoTons, distanceBetween, passengersWaiting } from './economy';
 import { Rng } from './rng';
 import { applyAction, currentCompany, currentIndex } from './reducer';
@@ -82,6 +83,45 @@ function runPlan(
   const co = () => currentCompany(get());
   const p = () => get().planets[co().planet]!;
   const ci = currentIndex(get());
+
+  // 0. answer any pending dialog (auction bid etc.), then maybe use the planet special
+  const answer = () => {
+    let guard = 0;
+    while (get().pending && guard++ < 5) {
+      const ev = get().pending!;
+      const ids = ev.choices.map((c) => c.id);
+      const choice =
+        ids.length === 0
+          ? 'ok'
+          : ids.includes('yes')
+            ? r.chance(0.6 + iq * 0.3)
+              ? 'yes'
+              : 'no'
+            : ids[0]!;
+      tryAct({
+        type: 'eventChoice',
+        choice,
+        amount: ev.input ? Math.min(ev.input.max, ev.input.initial) : undefined,
+      });
+    }
+  };
+  answer();
+  {
+    const special = PLANET_BY_ID[p().id].special;
+    const useful =
+      ((special === 'mechanic' || special === 'engines') && co().cash > 40000) ||
+      (special === 'zinn' && co().zinnLoan > 0) ||
+      (special === 'union' && co().unionLoan > 0) ||
+      special === 'fuel' ||
+      (special === 'shoreleave' && co().wagesOwed > 0) ||
+      (special === 'blessing' && co().mods.blessedWeeks === 0) ||
+      (special === 'insurance' && r.chance(0.5)) ||
+      (special === 'smuggler' && co().cash > 20000);
+    if (useful && r.chance(0.7)) {
+      tryAct({ type: 'special' });
+      answer();
+    }
+  }
 
   // 1. sell cargo that is profitable here (or everything if we've been hauling it a while)
   for (const c of Object.keys(co().cargo) as CommodityId[]) {

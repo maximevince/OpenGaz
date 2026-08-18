@@ -85,7 +85,7 @@
     <Btn color="green" onclick={() => game.go('menu')}>Continue</Btn>
     <Btn color="green" onclick={() => game.go('supply')}>Supply %</Btn>
     <Btn color="green" onclick={() => game.go('warehouse')}>Warehouse</Btn>
-    <Btn color="green" onclick={() => game.go('menu')}>Help</Btn>
+    <Btn color="green" onclick={() => game.help()}>Help</Btn>
   </div>
 
   {#if sel}

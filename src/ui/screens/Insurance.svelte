@@ -29,7 +29,7 @@
       onclick={() => game.dispatch({ type: 'buyInsurance' })}
       disabled={co.insured || co.cash < co.insurancePremium}>Purchase Voyager's Insurance</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>
 

@@ -122,6 +122,7 @@ export function insurancePremium(state: GameState, co: CompanyState, r: Rng): nu
   const risk = SHIP_BY_ID(co.ship.defId).risk;
   const cargo = cargoValue(co);
   const base = 300 + cargo * 0.02 + shipTons(co) * 1.5;
-  const p = base * risk * (0.85 + 0.3 * r.float()) * (co.luck < 0.3 ? 1.3 : 1);
+  const p =
+    base * risk * (0.85 + 0.3 * r.float()) * (co.luck < 0.3 ? 1.3 : 1) * (co.mods?.insurance ?? 1);
   return Math.max(15, Math.min(15000, Math.round(p)));
 }

@@ -40,7 +40,7 @@
     </Btn>
     <Btn color="black" onclick={() => (prompt = true)} disabled={affordable <= 0}>Buy some fuel</Btn
     >
-    <Btn color="black" onclick={() => game.go('menu')}>Help</Btn>
+    <Btn color="black" onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

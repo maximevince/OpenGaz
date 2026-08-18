@@ -62,7 +62,7 @@
     >
       Place the Ad
     </Btn>
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

@@ -70,7 +70,7 @@
     <Btn color="green" onclick={() => game.go('menu')}>Continue</Btn>
     <Btn color="green" onclick={() => game.go('market')}>Marketplace</Btn>
     <Btn color="green" onclick={() => game.go('map')}>Galaxy Map</Btn>
-    <Btn color="green" onclick={() => game.go('menu')}>Help</Btn>
+    <Btn color="green" onclick={() => game.help()}>Help</Btn>
   </div>
 </div>
 

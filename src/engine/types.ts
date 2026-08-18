@@ -4,7 +4,7 @@ import type { AiStyle } from './data/opponents';
 import type { PlanetId } from './data/planets';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /* ------------------------------------------------------------------ world */
 
@@ -112,6 +112,21 @@ export interface CompanyState {
   blessed: boolean;
   bankrupt: boolean;
   netWorthHistory: number[];
+  /** messages for this company, shown at its next arrival screen */
+  inbox: LogEntry[];
+  /** modifiers set by planet specials / events */
+  mods: {
+    /** insurance premium multiplier */
+    insurance: number;
+    /** fuel discount fraction on the next fill (0..1) */
+    fuelDiscount: number;
+    /** weeks of blessing left */
+    blessedWeeks: number;
+    /** engine already bought/upgraded flags etc. */
+    upgrades: number;
+    /** week the planet special was last used (one use per visit) */
+    specialWeek: number;
+  };
   /** running profit shown on the marketplace (this visit) */
   visitProfit: number;
   /** tons bought this visit per commodity (sold back at cost = full refund) */
@@ -140,8 +155,32 @@ export interface PendingEvent {
   text: string;
   /** choices offered; empty = just acknowledge */
   choices: { id: string; label: string }[];
+  /** optional numeric input (e.g. an auction bid) — sent back as `amount` */
+  input?: { label: string; min: number; max: number; initial: number };
+  /** portrait id for the UI (semantic asset id without the `portrait.` prefix) */
+  portrait?: string;
+  /** mood colours the dialog: good (navy), bad (red), neutral (green) */
+  mood?: 'good' | 'bad' | 'neutral';
+  /** travel events resume the journey afterwards; planet events return to the menu */
+  context: 'travel' | 'planet';
   /** free-form data the event resolver needs later */
   data?: Record<string, unknown>;
+}
+
+export interface Auction {
+  kind: 'ship' | 'facility';
+  /** facility name / upgrade description */
+  name: string;
+  /** facility: planet index; ship: -1 */
+  planet: number;
+  /** facility: landing fee it will charge */
+  fee: number;
+  /** minimum acceptable bid */
+  reserve: number;
+  /** bids by company index (AI bids filled in at creation) */
+  bids: Record<number, number>;
+  /** company indices still to bid */
+  waiting: number[];
 }
 
 export interface GameSettings {
@@ -165,6 +204,8 @@ export interface GameState {
   /** destination during travel/arrival */
   destination: number | null;
   pending: PendingEvent | null;
+  /** running secret-bid auction, if any */
+  auction: Auction | null;
   /** messages queued for the current company's arrival screen */
   arrivalReports: LogEntry[];
   log: LogEntry[];
@@ -199,7 +240,8 @@ export type Action =
   | { type: 'stockBuy'; shares: number }
   | { type: 'stockSell'; shares: number }
   | { type: 'journey'; to: number }
-  | { type: 'eventChoice'; choice: string }
+  | { type: 'special' } // use this planet's special institution
+  | { type: 'eventChoice'; choice: string; amount?: number }
   | { type: 'continue' }; // dismiss arrival reports -> next company
 
 export type ActionType = Action['type'];

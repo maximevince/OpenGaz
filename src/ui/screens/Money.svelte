@@ -147,7 +147,7 @@
     <Btn color="cyan" onclick={() => (tab = 'strength')}>Market Strength</Btn>
     <Btn color="cyan" onclick={() => (tab = 'players')}>Players</Btn>
     <Btn color="cyan" onclick={() => (tab = 'ship')}>Ship Info</Btn>
-    <Btn color="cyan" onclick={() => (tab = 'summary')}>Help</Btn>
+    <Btn color="cyan" onclick={() => game.help('money')}>Help</Btn>
   </div>
 </div>
 

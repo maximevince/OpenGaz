@@ -33,7 +33,7 @@
       onclick={() => game.dispatch({ type: 'payCrew' })}
       disabled={co.wagesOwed <= 0 || co.cash < co.wagesOwed}>Pay Employees</Btn
     >
-    <Btn onclick={() => game.go('menu')}>Help</Btn>
+    <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}
 </ServiceScreen>
 
