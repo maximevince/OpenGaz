@@ -25,8 +25,26 @@ body {
   color: #fff;
   font-family: var(--font-ui);
   overflow: hidden;
+  /* the stage does its own scaling, so nothing on the page should ever scroll or bounce */
+  overscroll-behavior: none;
+  /* keeps taps instant and stops double-tap zoom on the scaled stage */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* iOS inflates text in narrow blocks, which would overflow the fixed 640×480 layout */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #app {
   height: 100%;
+}
+
+/* the stage suppresses selection; form fields still need it (e.g. copying a game link) */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
