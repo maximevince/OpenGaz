@@ -159,8 +159,19 @@ The UI resolves images/sounds through an **asset pack** abstraction:
   from the owner's CD): used only to speed up early UI work; if the folder is missing the app
   silently falls back to `opengaz`/placeholders. Never committed or deployed (CI guard).
 
-## 12. Roadmap
+## 12. Roadmap / status
 
-M0 bootstrap → M1 engine core → M2 playable UI → M3 feature parity → M4 hot-seat + play-by-link →
-M5 recreated assets & polish → M6a P2P online (Trystero) → M6b optional hosted rooms (Cloudflare
-Durable Objects).
+- [x] M0 bootstrap (Vite + Svelte 5 + TS, CI, Pages workflow, asset packs)
+- [x] M1 engine core (deterministic reducer, economy, AI, save/link) — `src/engine`
+- [x] M2 playable UI (all main screens on the 640×480 stage)
+- [x] M3 parity: 14 planet specials, ~45 travel events, auctions (facilities, ship upgrades),
+      warehouse lottery, tax audits, help texts, weather, histories
+- [x] M4 hot-seat + play-by-link
+- [~] M5 assets: procedural SVG placeholders shipped; real recreated art/sound still to do
+  (`assets/` + `SOURCES.md`); no sound yet
+- [x] M6a online P2P rooms (Trystero) — `src/net/online.svelte.ts`
+- [ ] M6b optional hosted rooms (Cloudflare Worker + Durable Object) for async turns
+- [ ] Balance pass against the original (run it in DOSBox-X side by side); tutorial mode; shortcuts
+      (right-click); Bass broker tips are basic; AI opponents could be smarter/more distinct
+
+Balance sim: `SIM=1 SIM_N=30 pnpm vitest run sim --reporter=verbose --silent=false`.
