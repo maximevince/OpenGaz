@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---- OpenGaz: NEVER commit original LavaMind assets (dev-only local pack) ----
+public/original/
+assets-original/
+*.iso
+# local env
+.env
+.env.*
+
+# local research dumps (third-party text/screens) — not part of the repo
+docs/reference/

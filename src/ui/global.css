@@ -1,0 +1,32 @@
+/* OpenGaz global styles — the game lives on a fixed 640×480 virtual stage. */
+:root {
+  --stage-w: 640;
+  --stage-h: 480;
+  /* palette evoking 256-colour Win3.1 forms */
+  --c-periwinkle: #8080ff;
+  --c-navy: #000080;
+  --c-cyan: #00ffff;
+  --c-cyan-plate: #80ffff;
+  --c-yellow-plate: #ffff80;
+  --c-green: #008000;
+  --c-green-grid: #80ff80;
+  --c-face: #c0c0c0;
+  --c-hilite: #ffffff;
+  --c-shadow: #808080;
+  --c-dark: #000000;
+  --font-ui: 'Arial', 'Liberation Sans', 'Helvetica', sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
