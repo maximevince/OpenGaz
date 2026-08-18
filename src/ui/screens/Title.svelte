@@ -16,6 +16,7 @@
   <div class="menu">
     <Btn onclick={() => game.go('setup')}>New Game</Btn>
     <Btn disabled={!hasAuto} onclick={() => game.loadAutosave()}>Continue last game</Btn>
+    <Btn onclick={() => game.go('lobby')}>Play online</Btn>
     <Btn
       onclick={() => {
         game.state = game.state;

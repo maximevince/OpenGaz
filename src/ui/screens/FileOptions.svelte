@@ -1,6 +1,7 @@
 <script lang="ts">
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
+  import { online } from '../../net/online.svelte';
   let link = $state('');
   let copied = $state(false);
   let importText = $state('');
@@ -36,7 +37,7 @@
               tick++;
             }}>Save</Btn
           >
-          <Btn disabled={!i} onclick={() => game.loadSlot(n)}>Load</Btn>
+          <Btn disabled={!i || online.active} onclick={() => game.loadSlot(n)}>Load</Btn>
         </div>
       {/each}
       <p class="note">The game also autosaves after every action.</p>
@@ -53,12 +54,20 @@
         >{/if}
       <h3>Load from a link</h3>
       <textarea placeholder="paste a game link here" bind:value={importText}></textarea>
-      <Btn onclick={() => game.importLink(importText)} disabled={!importText.trim()}>Load link</Btn>
+      <Btn
+        onclick={() => game.importLink(importText)}
+        disabled={!importText.trim() || online.active}>Load link</Btn
+      >
     </div>
   </div>
   <div class="buttons">
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
-    <Btn onclick={() => game.go('title')}>Quit to title</Btn>
+    <Btn
+      onclick={() => {
+        online.leave();
+        game.go('title');
+      }}>Quit to title</Btn
+    >
   </div>
 </div>
 

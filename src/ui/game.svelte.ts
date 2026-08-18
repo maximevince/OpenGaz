@@ -2,6 +2,7 @@
  * UI-side game store: holds the engine state, dispatches actions, drives AI turns, autosaves,
  * and decides which screen is showing. All rules live in src/engine — this file only glues.
  */
+import { online } from '../net/online.svelte';
 import {
   ActionError,
   applyAction,
@@ -44,6 +45,8 @@ export type Screen =
   | 'travel'
   | 'event'
   | 'arrival'
+  | 'lobby'
+  | 'waiting'
   | 'gameover';
 
 const AUTOSAVE_KEY = 'opengaz.autosave';
@@ -57,6 +60,39 @@ class GameStore {
   helpFor = $state<Screen | null>(null);
   /** company index the UI is currently showing (for hot-seat handoff detection) */
   private shownCompany = -1;
+
+  constructor() {
+    online.onRemoteAction = (a) => this.applyRemote(a);
+    online.onStart = (s) => this.adopt(s);
+    online.onSync = (s) => this.adopt(s);
+    online.getState = () => this.state;
+  }
+
+  /** true when the local player may act for the current company */
+  get canAct(): boolean {
+    if (!this.state) return false;
+    return !online.active || online.ownsCompany(currentIndex(this.state));
+  }
+
+  /** replace the state wholesale (online start / resync) */
+  private adopt(s: GameState) {
+    this.state = s;
+    this.shownCompany = -1;
+    this.afterChange();
+  }
+
+  private applyRemote(a: Action) {
+    if (!this.state) return;
+    try {
+      this.state = applyAction(this.state, a);
+    } catch (e) {
+      // desync: ask the host for a fresh snapshot
+      console.warn('remote action rejected, requesting sync', e);
+      online.requestSync();
+      return;
+    }
+    this.afterChange();
+  }
 
   get s(): GameState {
     if (!this.state) throw new Error('no game');
@@ -87,9 +123,20 @@ class GameStore {
     this.afterChange();
   }
 
+  /** host: create the game and broadcast it to the room */
+  startOnline(opts: NewGameOptions) {
+    const s = newGame(opts);
+    online.startGame(s);
+    this.adopt(s);
+  }
+
   /** Apply an action; on rule violation show the message and keep the state. Returns success. */
   dispatch(a: Action): boolean {
     if (!this.state) return false;
+    if (!this.canAct) {
+      this.error = 'It is not your turn.';
+      return false;
+    }
     try {
       this.state = applyAction(this.state, a);
       this.error = null;
@@ -97,6 +144,7 @@ class GameStore {
       this.error = e instanceof ActionError ? e.message : String(e);
       return false;
     }
+    if (online.active) online.broadcastAction(a, this.state);
     this.afterChange();
     return true;
   }
@@ -107,6 +155,13 @@ class GameStore {
     if (s.phase === 'gameOver') {
       this.state = s;
       this.screen = 'gameover';
+      this.autosave();
+      return;
+    }
+    if (online.active && !online.ownsCompany(currentIndex(s)) && !isAiTurn(s)) {
+      // someone else's turn: spectate
+      this.shownCompany = currentIndex(s);
+      this.screen = 'waiting';
       this.autosave();
       return;
     }
@@ -131,16 +186,30 @@ class GameStore {
     }
     // human on planet
     const ci = currentIndex(s);
+    if (online.active && !online.ownsCompany(ci)) {
+      this.shownCompany = ci;
+      this.screen = 'waiting';
+      this.autosave();
+      return;
+    }
     const humans = s.companies.filter((c) => !c.isAI && !c.bankrupt).length;
-    if (ci !== this.shownCompany && humans > 1) {
+    if (ci !== this.shownCompany && humans > 1 && !online.active) {
       this.shownCompany = ci;
       this.screen = 'handoff';
     } else {
       this.shownCompany = ci;
       if (
-        ['event', 'arrival', 'travel', 'handoff', 'gameover', 'title', 'setup'].includes(
-          this.screen,
-        )
+        [
+          'event',
+          'arrival',
+          'travel',
+          'handoff',
+          'gameover',
+          'title',
+          'setup',
+          'lobby',
+          'waiting',
+        ].includes(this.screen)
       ) {
         this.screen = 'menu';
       }

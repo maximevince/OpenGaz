@@ -39,6 +39,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "lz-string": "^1.5.0"
+    "lz-string": "^1.5.0",
+    "trystero": "^0.25.3"
   }
 }

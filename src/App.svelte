@@ -28,6 +28,8 @@
   import Event from './ui/screens/Event.svelte';
   import Arrival from './ui/screens/Arrival.svelte';
   import GameOver from './ui/screens/GameOver.svelte';
+  import Lobby from './ui/screens/Lobby.svelte';
+  import Waiting from './ui/screens/Waiting.svelte';
 
   let ready = $state(false);
   // ?pack=opengaz forces the shipped pack even when the dev-only original pack is present
@@ -37,6 +39,7 @@
       ready = true;
       // play-by-link: #g=... in the URL
       if (location.hash.startsWith('#g=')) game.importLink(location.href);
+      else if (new URLSearchParams(location.search).get('room')) game.go('lobby');
     },
   );
   const screens = {
@@ -64,6 +67,8 @@
     event: Event,
     arrival: Arrival,
     gameover: GameOver,
+    lobby: Lobby,
+    waiting: Waiting,
   } as const;
   const Current = $derived(
     game.screen === 'title' ? null : (screens[game.screen as keyof typeof screens] ?? null),
@@ -73,7 +78,7 @@
 <Stage>
   {#if !ready}
     <div class="loading">Loading…</div>
-  {:else if game.screen === 'title' || (!game.state && game.screen !== 'setup')}
+  {:else if game.screen === 'title' || (!game.state && game.screen !== 'setup' && game.screen !== 'lobby')}
     <Title />
   {:else if Current}
     <Current />
