@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { img, activePack } from '../assets';
-  let { onstart }: { onstart: () => void } = $props();
+  import { activePack, img } from '../assets';
+  import Btn from '../components/Btn.svelte';
+  import { game } from '../game.svelte';
   const bg = img('screen.title');
   const pack = activePack();
+  const hasAuto = $derived(game.hasAutosave());
 </script>
 
 <div class="title" style:background-image={bg ? `url(${bg})` : undefined}>
@@ -11,8 +13,18 @@
     <h1>OpenGaz</h1>
     <p class="sub">an open-source homage to Gazillionaire Deluxe</p>
   {/if}
-  <button class="start" onclick={onstart}>Click to begin</button>
-  <div class="pack">asset pack: {pack}</div>
+  <div class="menu">
+    <Btn onclick={() => game.go('setup')}>New Game</Btn>
+    <Btn disabled={!hasAuto} onclick={() => game.loadAutosave()}>Continue last game</Btn>
+    <Btn
+      onclick={() => {
+        game.state = game.state;
+        game.go('file');
+      }}
+      disabled={!game.state}>File Options</Btn
+    >
+  </div>
+  <div class="pack">OpenGaz · asset pack: {pack}</div>
 </div>
 
 <style>
@@ -51,17 +63,19 @@
     font-size: 16px;
     color: #c0c0ff;
   }
-  .start {
+  .menu {
     position: absolute;
     left: 50%;
-    bottom: 60px;
+    bottom: 40px;
     transform: translateX(-50%);
-    padding: 8px 24px;
-    font: bold 16px var(--font-ui);
-    background: var(--c-face);
-    color: #000;
-    border: 2px outset #fff;
-    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 240px;
+  }
+  .menu :global(.btn) {
+    font-size: 15px;
+    padding: 7px;
   }
   .pack {
     position: absolute;

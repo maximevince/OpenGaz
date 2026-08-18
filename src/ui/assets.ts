@@ -34,6 +34,42 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 // Ids are dotted: `planet.<slug>.icon|medium|large|surface`, `ship.<n>.picture|icon`,
 // `portrait.<slug>`, `screen.title|win|lose`, `bg.stars.<n>`, `sfx.<slug>`.
 
+// semantic portrait id -> original file stem
+const PORTRAIT_MAP: Record<string, string> = {
+  union: 'loan1',
+  bank: 'bank',
+  zinn: 'zinn',
+  insurance: 'insure',
+  tax: 'tax',
+  crew: 'crew',
+  broker: 'broker1',
+  dealer: 'dealer1',
+  pilot: 'pilot',
+  news: 'news',
+  weather: 'weather',
+  dred: 'dred',
+  mechanic: 'mechan1',
+  sooth: 'sooth1',
+  police: 'police',
+  warehouse: 'warehous',
+  clock: 'clock',
+  history: 'history',
+  repair: 'repair',
+  meteor: 'meteor',
+  storm: 'storm',
+  fire: 'fire',
+  bandits: 'bandits',
+  pirates: 'bronap',
+  rebels: 'rebels',
+  snoz: 'snoz',
+  op1: 'op1',
+  op2: 'op2',
+  op3: 'op3',
+  op4: 'op4',
+  op5: 'op5',
+  op6: 'op6',
+};
+
 const originalGfx = (id: string): string | undefined => {
   const p = id.split('.');
   switch (p[0]) {
@@ -46,7 +82,7 @@ const originalGfx = (id: string): string | undefined => {
       return kind === 'icon' ? `ship${n}a` : `ship${n}`;
     }
     case 'portrait':
-      return p[1];
+      return PORTRAIT_MAP[p[1]!] ?? p[1];
     case 'screen':
       return { title: 'title', win: 'win', lose: 'lose', planets: 'planets', history: 'history' }[
         p[1]!
