@@ -30,6 +30,7 @@
   const hist = $derived(s.companies.map((c) => c.netWorthHistory.slice(-20)));
   const all = $derived(hist.flat());
   const minY = $derived(Math.min(0, ...all));
+  const maxAbs = $derived(Math.max(1, ...s.companies.map((c) => Math.abs(netWorth(s, c)))));
   const maxY = $derived(Math.max(100000, ...all));
   const y = (v: number) => H - PB - ((v - minY) / (maxY - minY)) * (H - PB - 10);
   const strengthTotal = $derived(
@@ -91,7 +92,8 @@
             <span class="bn">{c.name}</span>
             <div
               class="bar"
-              style:width={`${Math.max(2, Math.min(100, (Math.max(0, v) / Math.max(1, level.targetNetWorth)) * 100))}%`}
+              class:neg={v < 0}
+              style:width={`${Math.max(2, (Math.abs(v) / maxAbs) * 100)}%`}
               style:background={colors[i % colors.length]}
             ></div>
             <span class="bv">{c.bankrupt ? 'BANKRUPT' : fmt(v)}</span>
