@@ -42,6 +42,10 @@ Developers who own the original CD may import its media into a local, git-ignore
   (WebRTC via [Trystero](https://github.com/dmotz/trystero); public Nostr relays are used only to
   find each other). Everyone must be online at the same time; a dropped player can rejoin with the
   same name.
+- **On a phone or tablet** — the game is one fixed 640×480 stage scaled to fit whatever screen it
+  is on, so it stays fully visible and centred in both orientations. Landscape gives the largest
+  picture; in portrait a _Rotate to fill_ button turns the stage a quarter-turn for a third more
+  size, and remembers the choice.
 
 ## Development
 

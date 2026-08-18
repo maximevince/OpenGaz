@@ -150,6 +150,16 @@ Galaxy map: planets on starfield, "Return to Main Menu / Help". Stock: black scr
 chart 16 weeks. Money: net worth plates + icon bar (Company History / Net Worth bars / Market
 Strength pie / Computer Players / Ship Info). Events: coloured full-screen dialogs.
 
+### Fitting the stage to a screen
+
+Everything is laid out for 640×480; `src/ui/Stage.svelte` scales that stage uniformly to fit the
+visible viewport and centres it, letterboxing the rest in black. The available area is _measured_
+(a `ResizeObserver` on a `100dvh`, safe-area-padded box) rather than taken from
+`window.innerWidth/Height`, which on mobile browsers describes the viewport behind the collapsible
+toolbars and pushed part of the stage off screen. `src/ui/stage.ts` holds the pure fit maths.
+Portrait screens can optionally turn the stage a quarter-turn (`Rotate to fill`, remembered in
+`localStorage`) when that buys a meaningfully bigger picture.
+
 ## 11. Asset packs
 
 The UI resolves images/sounds through an **asset pack** abstraction:
