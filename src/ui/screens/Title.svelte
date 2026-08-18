@@ -1,5 +1,6 @@
 <script lang="ts">
   import { activePack, img } from '../assets';
+  import { BUILD } from '../build';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
   const bg = img('screen.title');
@@ -25,7 +26,7 @@
       disabled={!game.state}>File Options</Btn
     >
   </div>
-  <div class="pack">OpenGaz · asset pack: {pack}</div>
+  <div class="pack">OpenGaz {BUILD} · asset pack: {pack}</div>
 </div>
 
 <style>
