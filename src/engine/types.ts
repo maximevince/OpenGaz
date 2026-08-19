@@ -4,7 +4,10 @@ import type { AiStyle } from './data/opponents';
 import type { PlanetId } from './data/planets';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+
+/** Rules whose original releases diverged in meaningful gameplay ways. */
+export type Ruleset = 'deluxe1997' | 'steam';
 
 /* ------------------------------------------------------------------ world */
 
@@ -140,6 +143,7 @@ export type Phase =
   | 'travel' // journey animation / event resolution
   | 'event' // waiting for a choice on a travel event
   | 'arrival' // reports before the next company
+  | 'winner' // a winner may continue the escalating competition or retire
   | 'gameOver';
 
 export interface LogEntry {
@@ -185,6 +189,8 @@ export interface Auction {
 
 export interface GameSettings {
   level: Level;
+  ruleset: Ruleset;
+  /** The active win threshold. It increases when a player continues after winning. */
   targetNetWorth: number;
 }
 
@@ -240,6 +246,8 @@ export type Action =
   | { type: 'stockBuy'; shares: number }
   | { type: 'stockSell'; shares: number }
   | { type: 'journey'; to: number }
+  | { type: 'continueCompetition' }
+  | { type: 'retireCompetition' }
   | { type: 'special' } // use this planet's special institution
   | { type: 'eventChoice'; choice: string; amount?: number }
   | { type: 'continue' }; // dismiss arrival reports -> next company

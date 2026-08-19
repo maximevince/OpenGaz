@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { LEVELS, OPPONENTS, PLANETS, SHIPS, type Level, type PlanetId } from '../../engine';
+  import {
+    DELUXE_INITIAL_WINNING_POINT,
+    LEVELS,
+    OPPONENTS,
+    PLANETS,
+    SHIPS,
+    type Level,
+    type PlanetId,
+  } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
@@ -85,7 +93,7 @@
         >Level:
         <select bind:value={level}
           >{#each LEVELS as l (l.id)}<option value={l.id}
-              >{l.name} — goal {(l.targetNetWorth / 1e6).toFixed(1)}M</option
+              >{l.name} — goal {(DELUXE_INITIAL_WINNING_POINT / 1e6).toFixed(1)}M</option
             >{/each}</select
         >
       </label>

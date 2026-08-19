@@ -23,6 +23,7 @@ import { Rng } from './rng';
 import { resolveEventChoice, rollTravelEvents } from './events';
 import { resolveSpecialChoice, startSpecial } from './specials';
 import { maybeStartAuction, promptBid, recordBid, settleAuction } from './auctions';
+import { nextWinningPoint } from './rulesets';
 import {
   ActionError,
   type Action,
@@ -97,6 +98,8 @@ export function applyAction(input: GameState, action: Action): GameState {
 }
 
 function dispatch(state: GameState, a: Action, r: Rng): void {
+  if (a.type === 'continueCompetition' || a.type === 'retireCompetition')
+    return resolveWinningChoice(state, a.type);
   need(state.phase !== 'gameOver', 'game is over');
   if (a.type === 'continue') return doContinue(state, r);
   if (a.type === 'eventChoice') return doEventChoice(state, a.choice, a.amount, r);
@@ -513,7 +516,6 @@ function enterTurn(state: GameState): void {
 }
 
 function endWeek(state: GameState, r: Rng): void {
-  const level = LEVEL_BY_ID(state.settings.level);
   state.week++;
 
   // --- world: supply drift, restock, prices, fuel, exchanges ---
@@ -576,12 +578,18 @@ function endWeek(state: GameState, r: Rng): void {
     if (co.netWorthHistory.length > 60) co.netWorthHistory.shift();
   }
   const alive = state.companies.map((c, i) => [c, i] as const).filter(([c]) => !c.bankrupt);
-  const rich = alive.filter(([c]) => netWorth(state, c) >= level.targetNetWorth);
+  const rich = alive.filter(([c]) => netWorth(state, c) >= state.settings.targetNetWorth);
   if (rich.length > 0) {
     rich.sort((a, b) => netWorth(state, b[0]) - netWorth(state, a[0]));
     state.winner = rich[0]![1];
-    state.phase = 'gameOver';
-    log(state, -1, 'news', `${rich[0]![0].name} has become a GAZILLIONAIRE and wins the game!`);
+    // An AI-only simulation has no human available to answer the continuation decision.
+    state.phase = state.companies.some((co) => !co.isAI) ? 'winner' : 'gameOver';
+    log(
+      state,
+      -1,
+      'news',
+      `${rich[0]![0].name} reached ${fmt(state.settings.targetNetWorth)} kubars and leads the competition.`,
+    );
     return;
   }
   const humansAlive = alive.filter(([c]) => !c.isAI);
@@ -592,15 +600,45 @@ function endWeek(state: GameState, r: Rng): void {
     return;
   }
 
-  // --- new turn order = arrival order (shorter travel time first) ---
+  state.order = nextTurnOrder(state, alive);
+  state.turnIndex = 0;
+  state.phase = 'onPlanet';
+  enterTurn(state);
+}
+
+function nextTurnOrder(
+  state: GameState,
+  alive: readonly (readonly [CompanyState, number])[],
+): number[] {
   const prev = new Map(state.order.map((c, i) => [c, i]));
-  state.order = alive
-    .map(([, i]) => i)
-    .sort((a, b) => {
+  const byArrival = (a: number, b: number) => {
       const d = state.companies[a]!.lastTravelTime - state.companies[b]!.lastTravelTime;
       return d !== 0 ? d : (prev.get(a) ?? 0) - (prev.get(b) ?? 0);
-    });
-  state.turnIndex = 0;
+    };
+  const indices = alive.map(([, i]) => i);
+  if (state.settings.ruleset === 'steam') return indices.sort(byArrival);
+
+  // Deluxe resolves its human arrivals by travel time, then runs its six rivals in fixed order.
+  return [
+    ...indices.filter((i) => !state.companies[i]!.isAI).sort(byArrival),
+    ...indices.filter((i) => state.companies[i]!.isAI).sort((a, b) => a - b),
+  ];
+}
+
+function resolveWinningChoice(
+  state: GameState,
+  action: 'continueCompetition' | 'retireCompetition',
+): void {
+  need(state.phase === 'winner', 'there is no winning decision to make');
+  if (action === 'retireCompetition' || state.settings.ruleset === 'steam') {
+    state.phase = 'gameOver';
+    return;
+  }
+  state.settings.targetNetWorth = nextWinningPoint(
+    state.settings.ruleset,
+    state.settings.targetNetWorth,
+  );
+  state.winner = null;
   state.phase = 'onPlanet';
   enterTurn(state);
 }

@@ -176,10 +176,11 @@ class GameStore {
   /** Route to the right screen after the state changed, run AI turns, autosave. */
   private afterChange() {
     let s = this.s;
-    if (s.phase === 'gameOver') {
+    if (s.phase === 'gameOver' || s.phase === 'winner') {
       this.state = s;
       this.screen = 'gameover';
-      play(s.winner !== null && !s.companies[s.winner]!.isAI ? 'win' : 'lose');
+      if (s.phase === 'gameOver')
+        play(s.winner !== null && !s.companies[s.winner]!.isAI ? 'win' : 'lose');
       this.autosave();
       return;
     }
@@ -205,7 +206,7 @@ class GameStore {
     if (isAiTurn(s)) {
       s = runAi(s);
       this.state = s;
-      if (s.phase === 'gameOver') {
+      if (s.phase === 'gameOver' || s.phase === 'winner') {
         this.screen = 'gameover';
         this.autosave();
         return;

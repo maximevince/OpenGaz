@@ -8,6 +8,7 @@
   const winner = $derived(s.winner !== null ? s.companies[s.winner] : null);
   const humanWon = $derived(!!winner && !winner.isAI);
   const bg = $derived(img(humanWon ? 'screen.win' : 'screen.lose'));
+  const deciding = $derived(s.phase === 'winner');
 </script>
 
 <div class="go" style:background-image={bg ? `url(${bg})` : undefined}>
@@ -22,7 +23,15 @@
         <li>{c.name}: {c.bankrupt ? 'bankrupt' : fmt(netWorth(s, c))}</li>
       {/each}
     </ol>
-    <Btn onclick={() => game.go('title')}>Back to title</Btn>
+    {#if deciding}
+      <p>The next winning target is higher. Continue the competition or retire from it.</p>
+      <Btn color="green" onclick={() => game.dispatch({ type: 'continueCompetition' })}
+        >Keep playing</Btn
+      >
+      <Btn onclick={() => game.dispatch({ type: 'retireCompetition' })}>End game</Btn>
+    {:else}
+      <Btn onclick={() => game.go('title')}>Back to title</Btn>
+    {/if}
   </div>
 </div>
 

@@ -14,6 +14,7 @@ import {
   priceRange,
   runAi,
   COMMODITY_BY_ID,
+  SAVE_VERSION,
   type GameState,
 } from './index';
 
@@ -34,6 +35,8 @@ describe('setup', () => {
     expect(s.companies[0]!.isAI).toBe(false);
     expect(s.companies[0]!.cash).toBe(50000);
     expect(s.companies[0]!.zinnLoan).toBe(110000);
+    expect(s.settings.ruleset).toBe('deluxe1997');
+    expect(s.settings.targetNetWorth).toBe(1000000);
     expect(new Set(s.planets.map((p) => p.slot)).size).toBe(7);
   });
   it('is deterministic for the same seed', () => {
@@ -130,7 +133,7 @@ describe('money', () => {
 });
 
 describe('turns & weeks', () => {
-  it('advances through all companies then a new week with arrival ordering', () => {
+  it('advances through all companies then a new Deluxe week with human arrival ordering', () => {
     let s = base();
     expect(s.week).toBe(1);
     // human turn
@@ -142,9 +145,60 @@ describe('turns & weeks', () => {
     s = runAi(s);
     expect(s.week).toBe(2);
     expect(isAiTurn(s)).toBe(false);
-    // order sorted by travel time
-    const t = s.order.map((i) => s.companies[i]!.lastTravelTime);
+    const humans = s.order.filter((i) => !s.companies[i]!.isAI);
+    const rivals = s.order.filter((i) => s.companies[i]!.isAI);
+    const t = humans.map((i) => s.companies[i]!.lastTravelTime);
     for (let i = 1; i < t.length; i++) expect(t[i]!).toBeGreaterThanOrEqual(t[i - 1]!);
+    expect(rivals).toEqual([...rivals].sort((a, b) => a - b));
+  });
+
+  it('uses Deluxe human-then-rival order and preserves Steam arrival ordering behind its ruleset', () => {
+    const state = newGame({
+      seed: 'turn-order',
+      level: 'novice',
+      humans: [
+        { name: 'First', ship: 1 },
+        { name: 'Second', ship: 2 },
+      ],
+      ai: 2,
+    });
+    state.companies[0]!.lastTravelTime = 30;
+    state.companies[1]!.lastTravelTime = 10;
+    state.companies[2]!.lastTravelTime = 1;
+    state.companies[3]!.lastTravelTime = 2;
+    state.turnIndex = 3;
+    state.phase = 'arrival';
+    const deluxe = applyAction(state, { type: 'continue' });
+    expect(deluxe.order).toEqual([1, 0, 2, 3]);
+
+    state.settings.ruleset = 'steam';
+    const steam = applyAction(state, { type: 'continue' });
+    expect(steam.order).toEqual([2, 3, 1, 0]);
+  });
+
+  it('uses the Deluxe win ladder and requires a decision before continuing', () => {
+    const state = newGame({
+      seed: 'win-ladder',
+      level: 'novice',
+      humans: [{ name: 'Winner', ship: 1 }],
+      ai: 1,
+    });
+    state.companies[0]!.cash = 1_000_000;
+    state.companies[0]!.zinnLoan = 0;
+    state.turnIndex = 1;
+    state.phase = 'arrival';
+    const won = applyAction(state, { type: 'continue' });
+    expect(won.phase).toBe('winner');
+    expect(won.winner).toBe(0);
+    expect(won.settings.targetNetWorth).toBe(1_000_000);
+
+    const continued = applyAction(won, { type: 'continueCompetition' });
+    expect(continued.phase).toBe('onPlanet');
+    expect(continued.winner).toBeNull();
+    expect(continued.settings.targetNetWorth).toBe(2_000_000);
+
+    const retired = applyAction(won, { type: 'retireCompetition' });
+    expect(retired.phase).toBe('gameOver');
   });
 
   it('AI-only game runs to completion deterministically', () => {
@@ -179,6 +233,15 @@ describe('save', () => {
     const link = encodeForLink(s);
     expect(link.length).toBeLessThan(20000);
     expect(JSON.stringify(decodeFromLink(link))).toBe(JSON.stringify(s));
+  });
+
+  it('migrates version 2 saves to the legacy ruleset', () => {
+    const old = base();
+    old.version = 2;
+    delete (old.settings as { ruleset?: unknown }).ruleset;
+    const migrated = decodeFromLink(encodeForLink(old));
+    expect(migrated.version).toBe(SAVE_VERSION);
+    expect(migrated.settings.ruleset).toBe('steam');
   });
 });
 

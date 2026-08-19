@@ -3,6 +3,7 @@ export const GAME_NAME = 'OpenGaz';
 
 export * from './types';
 export * from './rng';
+export * from './rulesets';
 export * from './setup';
 export * from './reducer';
 export * from './economy';

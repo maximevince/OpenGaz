@@ -8,17 +8,18 @@
   const co = $derived(game.co);
   const nw = $derived(netWorth(s, co));
   const level = $derived(LEVEL_BY_ID(s.settings.level));
+  const target = $derived(s.settings.targetNetWorth);
   let tab: 'summary' | 'history' | 'networth' | 'strength' | 'players' | 'ship' = $state('summary');
   const alive = $derived(s.companies.map((c, i) => ({ c, i })).filter((x) => !x.c.bankrupt));
   const colors = ['#ff0000', '#00c000', '#0000ff', '#ff00ff', '#00c0c0', '#c0c000', '#ff8000'];
   const status = $derived(
     nw < 0
       ? 'Struggling'
-      : nw < level.targetNetWorth * 0.1
+      : nw < target * 0.1
         ? 'Modest'
-        : nw < level.targetNetWorth * 0.4
+        : nw < target * 0.4
           ? 'Respectable'
-          : nw < level.targetNetWorth * 0.8
+          : nw < target * 0.8
             ? 'Formidable'
             : 'Supreme',
   );
@@ -45,7 +46,7 @@
         <Plate label="Net Worth:" value={fmt(nw)} color="yellow" />
         <Plate label="Game Level:" value={level.name} color="yellow" />
         <Plate label="Company Status:" value={status} color="yellow" />
-        <Plate label="Goal:" value={`${fmt(level.targetNetWorth)} net worth`} color="yellow" />
+        <Plate label="Goal:" value={`${fmt(target)} net worth`} color="yellow" />
         <div class="breakdown">
           cash {fmt(co.cash)} + bank {fmt(co.bank)} + shares {fmt(sharesValue(s, co))} − Union {fmt(
             co.unionLoan,
@@ -99,7 +100,7 @@
             <span class="bv">{c.bankrupt ? 'BANKRUPT' : fmt(v)}</span>
           </div>
         {/each}
-        <div class="goal">goal: {fmt(level.targetNetWorth)}</div>
+        <div class="goal">goal: {fmt(target)}</div>
       </div>
     {:else if tab === 'strength'}
       <div class="bars">

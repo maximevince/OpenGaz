@@ -7,9 +7,15 @@ export function serialize(state: GameState): string {
 
 export function deserialize(json: string): GameState {
   const s = JSON.parse(json) as GameState;
-  if (typeof s !== 'object' || s === null || s.version !== SAVE_VERSION) {
+  if (typeof s !== 'object' || s === null) {
     throw new Error(`unsupported save version ${(s as { version?: unknown })?.version}`);
   }
+  if (s.version === 2) {
+    // Version 2 predates rulesets. Preserve its previously shipped behavior for existing saves.
+    s.version = SAVE_VERSION;
+    s.settings.ruleset = 'steam';
+  }
+  if (s.version !== SAVE_VERSION) throw new Error(`unsupported save version ${s.version}`);
   return s;
 }
 

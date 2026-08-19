@@ -10,7 +10,14 @@ import {
   stockForSupply,
 } from './economy';
 import { Rng, seedFromString } from './rng';
-import { SAVE_VERSION, type CompanyState, type GameState, type PlanetState } from './types';
+import { initialWinningPoint } from './rulesets';
+import {
+  SAVE_VERSION,
+  type CompanyState,
+  type GameState,
+  type PlanetState,
+  type Ruleset,
+} from './types';
 
 export interface NewGameOptions {
   seed: string;
@@ -25,6 +32,8 @@ export interface NewGameOptions {
   /** explicit opponent ids (see data/opponents.ts), in seat order */
   opponents?: string[];
   aiIq?: number;
+  /** Defaults to the 1997 Deluxe rules. */
+  ruleset?: Ruleset;
 }
 
 export function newGame(opts: NewGameOptions): GameState {
@@ -45,10 +54,15 @@ export function newGame(opts: NewGameOptions): GameState {
           COMMODITIES.findIndex((c) => c.id === a) - COMMODITIES.findIndex((c) => c.id === b),
       );
 
+  const ruleset = opts.ruleset ?? 'deluxe1997';
   const state: GameState = {
     version: SAVE_VERSION,
     rng: r.state,
-    settings: { level: level.id, targetNetWorth: level.targetNetWorth },
+    settings: {
+      level: level.id,
+      ruleset,
+      targetNetWorth: initialWinningPoint(ruleset, level.targetNetWorth),
+    },
     week: 1,
     commodities,
     planets: [],
