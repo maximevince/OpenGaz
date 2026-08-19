@@ -15,13 +15,16 @@ import {
   applyShipUpgrade,
   badChainStreak,
   cargoTons,
+  companyLocation,
   computePassengers,
   currentCompany,
   currentIndex,
   decodeFromLink,
   deserialize,
   encodeForLink,
+  facilityHoldings,
   fuelUsage,
+  hasFlownThisWeek,
   goodChainStreak,
   humanTravelTime,
   netWorth,
@@ -501,7 +504,58 @@ describe('bankruptcy', () => {
   });
 });
 
+describe('facilities and locations', () => {
+  it('reports a company where its ship is parked, not where it is headed', () => {
+    const s = base({
+      humans: [
+        { name: 'A', ship: 1 },
+        { name: 'B', ship: 1 },
+      ],
+    });
+    const ci = currentIndex(s);
+    const from = s.companies[ci]!.planet;
+    expect(companyLocation(s, ci)).toBe(from);
+    expect(hasFlownThisWeek(s, ci)).toBe(false);
+    // rivals move inside the rollover, so `planet` is always current for them
+    const rival = s.companies.findIndex((c) => c.isAI);
+    expect(companyLocation(s, rival)).toBe(s.companies[rival]!.planet);
+    expect(hasFlownThisWeek(s, rival)).toBe(true);
+
+    let n = applyAction(s, { type: 'journey', to: (from + 1) % 7 });
+    while (n.pending)
+      n = applyAction(n, { type: 'eventChoice', choice: n.pending.choices[0]?.id ?? 'ok' });
+    // the departure report is dismissed to hand over to the next human
+    if (n.phase === 'arrival') n = applyAction(n, { type: 'continue' });
+    // the destination is declared, but the ship stays put until the week rolls over
+    expect(n.week).toBe(s.week);
+    expect(n.companies[ci]!.planet).toBe((from + 1) % 7);
+    expect(hasFlownThisWeek(n, ci)).toBe(true);
+    expect(companyLocation(n, ci)).toBe(from);
+  });
+
+  it('folds the facilities on a planet into per-owner totals', () => {
+    const s = base();
+    expect(facilityHoldings(s, 0).every((h) => h.count === 0)).toBe(true);
+    s.planets[0]!.facilities.push(
+      { id: 'a', name: 'Spaceport', fee: 500, owner: 1, revenue: 200 },
+      { id: 'b', name: 'Customs House', fee: 300, owner: 1, revenue: 0 },
+      { id: 'c', name: 'Dry Dock', fee: 100, owner: -1, revenue: 0 }, // seized on bankruptcy
+    );
+    const rows = facilityHoldings(s, 0);
+    expect(rows[1]).toEqual({ company: 1, count: 2, fee: 800, revenue: 200 });
+    expect(rows[0]!.count).toBe(0);
+    expect(rows.reduce((a, h) => a + h.count, 0)).toBe(2);
+  });
+});
+
 describe('saves', () => {
+  it('refuses a save from an older engine rather than half-migrating it', () => {
+    const s = base();
+    const old = JSON.parse(serialize(s)) as GameState;
+    old.version = 2;
+    expect(() => deserialize(JSON.stringify(old))).toThrow(/unsupported save version/);
+  });
+
   it('round-trips through JSON and through a link', () => {
     const s = base();
     expect(s.version).toBe(SAVE_VERSION);

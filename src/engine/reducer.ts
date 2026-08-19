@@ -7,6 +7,7 @@
  */
 import { COMMODITY_BY_ID, type CommodityId } from './data/commodities';
 import { ECON, LEVEL_BY_ID } from './data/levels';
+import { RIVAL_TAUNTS } from './data/opponents';
 import { PLANET_BY_ID } from './data/planets';
 import { moveOpponents, runOpponents } from './ai';
 import { auctionReportFor, recordBid, runAuctionWeek } from './auctions';
@@ -59,6 +60,30 @@ import {
 
 export function currentIndex(state: GameState): number {
   return state.order[state.turnIndex] ?? -1;
+}
+
+/**
+ * Where a company is physically standing this week.
+ *
+ * A company that has already flown this week has `planet` pointing at the destination it
+ * declared, while its ship is still parked on `planetLast` until the week rolls over. Rivals
+ * move inside the rollover, so `planet` is always current for them.
+ */
+export function companyLocation(state: GameState, ci: number): number {
+  const co = state.companies[ci];
+  if (!co) return -1;
+  if (co.isAI) return co.planet;
+  const seat = state.order.indexOf(ci);
+  return seat >= 0 && seat < state.turnIndex ? co.planetLast : co.planet;
+}
+
+/** True when this company has already taken its turn in the current week. */
+export function hasFlownThisWeek(state: GameState, ci: number): boolean {
+  const co = state.companies[ci];
+  if (!co) return false;
+  if (co.isAI) return true; // rivals all move inside the week rollover
+  const seat = state.order.indexOf(ci);
+  return seat >= 0 && seat < state.turnIndex;
 }
 
 export function currentCompany(state: GameState): CompanyState {
@@ -657,11 +682,42 @@ function enterTurn(state: GameState): void {
   state.phase = state.arrivalReports.length ? 'arrival' : 'onPlanet';
 }
 
+/**
+ * Who was already standing here when you landed. Rivals move inside the week rollover and
+ * humans fly in turn order, so anyone reported here reached the market ahead of you.
+ */
+function reportNeighbours(state: GameState, co: CompanyState, ci: number): void {
+  const here = co.planet;
+  const pname = PLANET_BY_ID[state.planets[here]!.id].name;
+  let n = 0;
+  for (let oi = 0; oi < state.companies.length; oi++) {
+    const other = state.companies[oi]!;
+    if (oi === ci || other.bankrupt) continue;
+    if (companyLocation(state, oi) !== here || !hasFlownThisWeek(state, oi)) continue;
+    if (other.isAI) {
+      const taunt = RIVAL_TAUNTS[(co.random + n) % RIVAL_TAUNTS.length]!;
+      const hold =
+        other.aiTag && other.aiCargo > 0
+          ? `, holds full of ${fmt(other.aiCargo)} tons of ${COMMODITY_BY_ID[other.aiTag].name}`
+          : ', holds empty';
+      report(state, 'info', `${other.name} is already parked on ${pname}${hold}. ${taunt}`);
+    } else {
+      report(
+        state,
+        'warn',
+        `${other.name} touched down on ${pname} before you and has already had the pick of the market.`,
+      );
+    }
+    n++;
+  }
+}
+
 /** Arrival charges: import tariff, then facility fees paid and collected. */
 function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
   const p = state.planets[co.planet]!;
   const pname = PLANET_BY_ID[p.id].name;
   report(state, 'info', `You touch down on ${pname}.`);
+  reportNeighbours(state, co, ci);
 
   // import tariff — only assessed if you already owe something (a quirk of the original)
   if (co.taxOwedPassenger + co.taxOwedTariff !== 0) {

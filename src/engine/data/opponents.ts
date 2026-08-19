@@ -124,3 +124,20 @@ export const OPPONENTS: readonly OpponentDef[] = [
 
 export const OPPONENT_BY_ID = (id: string): OpponentDef | undefined =>
   OPPONENTS.find((o) => o.id === id);
+
+/**
+ * Throwaway lines a rival drops when a human lands on a planet it is already parked on.
+ * Picked by the arriving player's weekly `random` roll, so the same week always reads the same.
+ */
+export const RIVAL_TAUNTS: readonly string[] = [
+  'They wave from the next landing pad, a little too cheerfully.',
+  'Their loadmaster makes a show of checking a very full manifest.',
+  'They offer you a cup of something warm and refuse to say what is in it.',
+  'Their pilot asks, loudly, whether your engine has always sounded like that.',
+  'They have already booked the good berth, the shaded one, near the gate.',
+  'Their agent is on the comm to the market before your ramp is down.',
+  'They congratulate you on making it here at all, which is somehow not a compliment.',
+  'Someone in their crew is taking notes on what you unload.',
+  'They ask after your loan, by name, and by amount.',
+  'Their captain smiles the smile of a company that bought cheap this morning.',
+];

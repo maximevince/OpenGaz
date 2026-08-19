@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    companyLocation,
     netWorth,
     newsHeadline,
     planetName,
@@ -18,6 +19,17 @@
       .sort((a, b) => (a.c.bankrupt ? 1 : 0) - (b.c.bankrupt ? 1 : 0) || b.nw - a.nw),
   );
   const leader = $derived(standings[0]);
+  /** facilities owned across the whole galaxy, by company index */
+  const owned = $derived(
+    s.planets.reduce(
+      (acc, p) => {
+        for (const f of p.facilities) if (f.owner >= 0) acc[f.owner] = (acc[f.owner] ?? 0) + 1;
+        return acc;
+      },
+      s.companies.map(() => 0),
+    ),
+  );
+  const anyFacilities = $derived(owned.some((n) => n > 0));
   /** the week's rival moves and auction results, newest last */
   const chatter = $derived(s.log.filter((l) => l.company === -1 && l.week >= s.week - 1).slice(-4));
 </script>
@@ -34,6 +46,7 @@
           <th>Net Worth</th>
           <th>% of Goal</th>
           <th>Ship</th>
+          {#if anyFacilities}<th>Facilities</th>{/if}
           <th>Located</th>
         </tr>
       </thead>
@@ -47,7 +60,8 @@
             </td>
             <td>{row.c.bankrupt ? '—' : `${Math.round((row.nw / target) * 100)}%`}</td>
             <td>{row.c.ship.tons} t</td>
-            <td>{planetName(s, row.c.planet)}</td>
+            {#if anyFacilities}<td>{owned[row.i] || '—'}</td>{/if}
+            <td>{planetName(s, companyLocation(s, row.i))}</td>
           </tr>
         {/each}
       </tbody>
