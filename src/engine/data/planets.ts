@@ -171,10 +171,10 @@ export const MAP_SLOTS: readonly { x: number; y: number }[] = [
   { x: 0, y: 1 },
 ];
 
-/** Distance between two slots in "million kuters" (rounded Euclidean, min 1). */
+/** Distance between two slots in "million kuters" — raw Euclidean, never rounded. */
 export function slotDistance(a: number, b: number): number {
   if (a === b) return 0;
   const p = MAP_SLOTS[a]!;
   const q = MAP_SLOTS[b]!;
-  return Math.max(1, Math.round(Math.hypot(p.x - q.x, p.y - q.y)));
+  return Math.hypot(p.x - q.x, p.y - q.y);
 }

@@ -36,6 +36,14 @@ export class Rng {
     if (hi < lo) [lo, hi] = [hi, lo];
     return lo + Math.floor(this.float() * (hi - lo + 1));
   }
+  /**
+   * The original's `f_rnd(a,b) = floor(a + random*(b-a+1))` — accepts fractional bounds
+   * (e.g. `fint(1, dist/2)` with dist odd) and floors the result.
+   */
+  fint(lo: number, hi: number): number {
+    if (hi < lo) [lo, hi] = [hi, lo];
+    return Math.floor(lo + this.float() * (hi - lo + 1));
+  }
   chance(p: number): boolean {
     return this.float() < p;
   }

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { passengersWaiting } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import Plate from '../components/Plate.svelte';
@@ -7,7 +6,7 @@
   import { fmt } from '../format';
   import { game } from '../game.svelte';
   const co = $derived(game.co);
-  const waiting = $derived(passengersWaiting(co));
+  const waiting = $derived(co.paxWaiting);
   const ship = $derived(img(`ship.${co.ship.defId}.picture`));
   let prompt = $state(false);
 </script>
@@ -27,7 +26,6 @@
       color={co.passengers > 0 ? 'green' : 'cyan'}
     />
     <Plate label="Expected fare income:" value={fmt(waiting * co.ticketPrice)} />
-    {#if co.onStrike}<Plate label="Crew on strike — nobody boards!" color="yellow" />{/if}
     <div class="note">
       Fares are paid on arrival and taxed. Set the price too high and nobody shows up; advertise to
       fill the seats.

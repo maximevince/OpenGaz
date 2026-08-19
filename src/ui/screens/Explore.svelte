@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PLANET_BY_ID, seedFromString } from '../../engine';
+  import { PLANET_BY_ID, newsHeadline, weatherForecast } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import Portrait from '../components/Portrait.svelte';
   import { game } from '../game.svelte';
@@ -9,13 +9,14 @@
   const def = $derived(PLANET_BY_ID[p.id]);
   type Tab = 'special' | 'weather' | 'news' | 'time' | 'history';
   let tab = $state<Tab>('special');
-  const news = $derived(
+  const headline = $derived(newsHeadline(s));
+  const olderNews = $derived(
     s.log
       .filter((l) => l.company === -1)
-      .slice(-8)
+      .slice(-6)
       .reverse(),
   );
-  const specialUsed = $derived(co.mods.specialWeek === s.week);
+  const specialUsed = $derived(co.specialUsed);
   const SPECIAL_BLURB: Record<string, string> = {
     magistrate:
       'Petition the Imperial Magistrate for lower tariffs or taxes. Rarely granted; occasionally backfires.',
@@ -35,18 +36,7 @@
     casino: 'A straight 50/50 wager of 5 % of your cash, with a double-or-nothing on top.',
     smuggler: 'Lady Cornucopia offers a commodity at or below market price. No paperwork.',
   };
-  // deterministic weather text per planet & week
-  const weather = $derived.by(() => {
-    const h = seedFromString(`${p.id}-${s.week}`);
-    const meteors = ['minimal', 'light', 'moderate', 'heavy'][h % 4];
-    const solar = ['quiet', 'restless', 'stormy'][(h >> 3) % 3];
-    const pirates = [
-      'no reports',
-      'rumours of Bro Nap sightings',
-      'Baid-Rowel bandits active on the outer routes',
-    ][(h >> 6) % 3];
-    return `Meteor activity: ${meteors}. Solar weather: ${solar}. Pirates: ${pirates}. Your luck reads ${co.luck >= 0.6 ? 'favourable' : co.luck <= 0.35 ? 'poor — insure the trip' : 'average'}.`;
-  });
+  const weather = $derived(weatherForecast(s));
   const portraitId = $derived(
     tab === 'news'
       ? 'news'
@@ -70,14 +60,15 @@
       {#if tab === 'special'}
         <h3>Planet Special</h3>
         <p>{SPECIAL_BLURB[def.special]}</p>
-        {#if specialUsed}<p class="dim">You have already used the special this week.</p>{/if}
+        {#if specialUsed}<p class="dim">You have already paid your visit this stop.</p>{/if}
         <Btn color="green" disabled={specialUsed} onclick={() => game.dispatch({ type: 'special' })}
           >Visit the special</Btn
         >
       {:else if tab === 'news'}
-        <h3>Channel 7 Kuku News</h3>
-        {#if news.length === 0}<p>Nothing to report. Slow news week in the colonies.</p>{/if}
-        {#each news as n, i (i)}<p>• wk {n.week}: {n.text}</p>{/each}
+        <h3>Channel 7 Kuku News — week {s.week}</h3>
+        <p><b>{headline}</b></p>
+        {#if olderNews.length}<hr />{/if}
+        {#each olderNews as n, i (i)}<p class="dim">• wk {n.week}: {n.text}</p>{/each}
       {:else if tab === 'weather'}
         <h3>Weather Bureau — week {s.week}</h3>
         <p>{weather}</p>

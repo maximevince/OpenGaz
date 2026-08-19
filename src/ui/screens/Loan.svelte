@@ -3,7 +3,7 @@
   import Plate from '../components/Plate.svelte';
   import Prompt from '../components/Prompt.svelte';
   import ServiceScreen from '../components/ServiceScreen.svelte';
-  import { fmt, pct } from '../format';
+  import { fmt } from '../format';
   import { game } from '../game.svelte';
   const co = $derived(game.co);
   const room = $derived(Math.max(0, co.unionLimit - co.unionLoan));
@@ -17,13 +17,10 @@
 >
   {#snippet plates()}
     <Plate label="Loan Amount:" value={fmt(co.unionLoan)} />
-    <Plate label="Interest Rate:" value={`${pct(co.unionRate)} per week`} />
+    <Plate label="Interest Rate:" value={`${co.loanRate}% per week`} />
     <Plate label="Credit Limit:" value={fmt(co.unionLimit)} />
     <Plate label="Cash:" value={fmt(co.cash)} />
-    <Plate
-      label="Interest Paid (last week):"
-      value={fmt(Math.round(co.unionLoan - co.unionLoan / (1 + co.unionRate)))}
-    />
+    <Plate label="Interest Paid (last week):" value={fmt(co.loanInterest)} />
   {/snippet}
   {#snippet extra()}
     <div class="warn">

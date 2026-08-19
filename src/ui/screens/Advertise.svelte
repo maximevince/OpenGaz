@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ECON, adSpend } from '../../engine';
+  import { ECON, adCost } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import Plate from '../components/Plate.svelte';
   import { fmt } from '../format';
@@ -12,8 +12,8 @@
     pax = co.adPassenger;
     com = co.adCommodity;
   });
-  const cost = $derived(adSpend(pax, co) + adSpend(com, co));
-  const paid = $derived(adSpend(co.adPassenger, co) + adSpend(co.adCommodity, co));
+  const cost = $derived(adCost(pax, co) + adCost(com, co));
+  const paid = $derived(co.advertInvestedP + co.advertInvestedC);
 </script>
 
 <div class="ads">
@@ -37,7 +37,7 @@
             onchange={() => (tab === 'passenger' ? (pax = i) : (com = i))}
           />
           <span class="nm">{name}</span>
-          <span class="cost">{fmt(adSpend(i, co))}</span>
+          <span class="cost">{fmt(adCost(i, co))}</span>
         </label>
       {/each}
     </div>

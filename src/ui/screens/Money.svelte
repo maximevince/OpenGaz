@@ -137,7 +137,7 @@
         <Plate label="Fuel tank:" value={`${co.ship.fuelCap} tons`} />
         <Plate label="Engine:" value={`${co.ship.kuarps} kuarps`} />
         <Plate label="Crew:" value={co.ship.crew} />
-        <Plate label="Class:" value={`${Math.round(400 * co.ship.klass)}-ton`} />
+        <Plate label="Class:" value={`${co.ship.tons}-ton`} />
       </div>
     {/if}
   </div>

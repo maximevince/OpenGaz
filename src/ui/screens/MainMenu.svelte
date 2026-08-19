@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PLANET_BY_ID, cargoTons, passengersWaiting } from '../../engine';
+  import { PLANET_BY_ID, cargoTons } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import SoundToggle from '../components/SoundToggle.svelte';
@@ -42,15 +42,15 @@
       >
     </div>
     <Btn color="green" onclick={() => game.go('passengers')}>
-      Pickup Passengers: {co.passengers > 0 ? `${co.passengers} aboard` : passengersWaiting(co)}
+      Pickup Passengers: {co.paxPickedUp ? `${co.passengers} aboard` : co.paxWaiting}
     </Btn>
     <Btn color="green" onclick={() => game.go('advertise')}>Advertise for Next Planet</Btn>
     <Btn color="green" onclick={() => game.go('crew')}>
-      Crew Wages Owed: {fmt(co.wagesOwed)}{co.onStrike ? ' — ON STRIKE!' : ''}
+      Crew Wages Owed: {fmt(co.wagesOwed)}
     </Btn>
     <Btn color="green" onclick={() => game.go('taxes')}>Taxes Owed: {fmt(taxes)}</Btn>
     <Btn color="green" onclick={() => game.go('insurance')}>
-      Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insurancePremium)}
+      Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insuranceCost)}
     </Btn>
     <Btn color="green" onclick={() => game.go('explore')}>Explore Planet</Btn>
     <Btn color="green" onclick={() => game.go('file')}>File Options</Btn>

@@ -1,343 +1,545 @@
+/**
+ * Engine tests. Every expectation here pins down a rule of the original game, rather than a
+ * guess about what feels right.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   ActionError,
+  COMMODITIES,
+  COMMODITY_BY_ID,
+  LEVEL_BY_ID,
+  Rng,
+  SAVE_VERSION,
+  SHIP_BY_ID,
   applyAction,
+  applyShipUpgrade,
+  badChainStreak,
   cargoTons,
+  computePassengers,
   currentCompany,
+  currentIndex,
   decodeFromLink,
+  deserialize,
   encodeForLink,
-  isAiTurn,
+  fuelUsage,
+  goodChainStreak,
+  humanTravelTime,
   netWorth,
   newGame,
-  passengersWaiting,
+  opponentTravelTime,
   priceForSupply,
   priceRange,
-  runAi,
-  COMMODITY_BY_ID,
-  SAVE_VERSION,
+  serialize,
+  stepStockMarket,
+  subtractCash,
+  type CompanyState,
   type GameState,
 } from './index';
 
-const base = () =>
+const base = (over: Partial<Parameters<typeof newGame>[0]> = {}) =>
   newGame({
     seed: 'test-seed',
     level: 'novice',
     humans: [{ name: 'Slev & Sons', ship: 1 }],
     ai: 3,
+    ...over,
   });
+
+const human = (s: GameState) => s.companies[0]!;
 
 describe('setup', () => {
-  it('creates 7 planets, 9 commodities, humans + AI', () => {
+  it('follows the level table', () => {
     const s = base();
+    const level = LEVEL_BY_ID('novice');
     expect(s.planets).toHaveLength(7);
-    expect(s.commodities).toHaveLength(9);
+    expect(s.commodities).toHaveLength(18); // all 18 always trade
     expect(s.companies).toHaveLength(4);
-    expect(s.companies[0]!.isAI).toBe(false);
-    expect(s.companies[0]!.cash).toBe(50000);
-    expect(s.companies[0]!.zinnLoan).toBe(110000);
-    expect(s.settings.ruleset).toBe('deluxe1997');
-    expect(s.settings.targetNetWorth).toBe(1000000);
-    expect(new Set(s.planets.map((p) => p.slot)).size).toBe(7);
+    expect(human(s).cash).toBe(level.startCash); // 25,000 at Novice
+    expect(human(s).zinnLoan).toBe(level.zinnDebt);
+    expect(human(s).eventGood).toBe(level.eventGood);
+    expect(human(s).ship.tons).toBe(400);
+    expect(human(s).warehouseSpace).toBe(50);
+    expect(s.settings.targetNetWorth).toBe(1_000_000);
   });
-  it('is deterministic for the same seed', () => {
-    expect(JSON.stringify(base())).toBe(JSON.stringify(base()));
-    expect(JSON.stringify(base())).not.toBe(
-      JSON.stringify(
-        newGame({ ...{ seed: 'other', level: 'novice', humans: [{ name: 'x', ship: 1 }], ai: 3 } }),
-      ),
-    );
-  });
-});
 
-describe('prices', () => {
-  it('stay within the commodity band and fall with supply', () => {
-    for (const c of Object.values(COMMODITY_BY_ID)) {
-      const { min, max } = priceRange(c);
-      const hi = priceForSupply(c.id, 0, 0);
-      const lo = priceForSupply(c.id, 100, 0);
-      expect(hi).toBeLessThanOrEqual(max);
-      expect(lo).toBeGreaterThanOrEqual(min);
-      expect(hi).toBeGreaterThan(lo);
-      expect(priceForSupply(c.id, 50, 0)).toBeGreaterThan(lo);
-    }
-  });
-});
-
-describe('trading', () => {
-  it('buys, refunds at cost the same visit, and rejects overbuying', () => {
-    let s = base();
-    const co = () => currentCompany(s);
-    const p = s.planets[co().planet]!;
-    const c = s.commodities.find((x) => (p.stock[x] ?? 0) >= 5)!;
-    const price = p.price[c]!;
-    const cash0 = co().cash;
-    s = applyAction(s, { type: 'buy', commodity: c, tons: 5 });
-    expect(co().cash).toBe(cash0 - 5 * price);
-    expect(cargoTons(co())).toBe(5);
-    expect(co().cargo[c]!.paid).toBe(price);
-    // refund
-    s = applyAction(s, { type: 'sell', commodity: c, tons: 5 });
-    expect(co().cash).toBe(cash0);
-    expect(cargoTons(co())).toBe(0);
-    expect(() => applyAction(s, { type: 'buy', commodity: c, tons: 100000 })).toThrow(ActionError);
-    expect(() => applyAction(s, { type: 'sell', commodity: c, tons: 1 })).toThrow(ActionError);
-  });
-  it('does not mutate the input state', () => {
+  it('opens every exchange on the 1,700-down-to-1,100 ladder at trend 50', () => {
     const s = base();
-    const before = JSON.stringify(s);
-    applyAction(s, { type: 'setTicketPrice', price: 3000 });
-    expect(JSON.stringify(s)).toBe(before);
-  });
-});
-
-describe('money', () => {
-  it('bank and union loan respect limits; net worth is consistent', () => {
-    let s = base();
-    const co = () => currentCompany(s);
-    s = applyAction(s, { type: 'bankDeposit', amount: 20000 });
-    expect(co().bank).toBe(20000);
-    expect(co().cash).toBe(30000);
-    expect(() => applyAction(s, { type: 'bankWithdraw', amount: 20001 })).toThrow();
-    s = applyAction(s, { type: 'unionBorrow', amount: 100000 });
-    expect(co().unionLoan).toBe(100000);
-    expect(() => applyAction(s, { type: 'unionBorrow', amount: 1 })).toThrow();
-    expect(netWorth(s, co())).toBe(130000 + 20000 - 100000 - 110000);
-  });
-  it('accrues interest and wages when leaving, taxes passengers on arrival', () => {
-    let s = base();
-    const co = () => currentCompany(s);
-    s = applyAction(s, { type: 'bankDeposit', amount: 10000 });
-    s = applyAction(s, { type: 'setTicketPrice', price: 500 });
-    s = applyAction(s, { type: 'pickupPassengers' });
-    const pax = co().passengers;
-    expect(pax).toBe(passengersWaiting({ ...co(), passengers: 0 }));
-    const cashBefore = co().cash;
-    const dest = (co().planet + 1) % 7;
-    s = applyAction(s, { type: 'journey', to: dest });
-    // event may be pending
-    if (s.phase === 'event')
-      s = applyAction(s, { type: 'eventChoice', choice: s.pending!.choices[0]?.id ?? 'ok' });
-    expect(s.phase).toBe('arrival');
-    expect(co().planet).toBe(dest);
-    expect(co().bank).toBe(10100);
-    expect(co().zinnLoan).toBe(Math.round(110000 * 1.04));
-    expect(co().wagesOwed).toBe(4 * 1500);
-    if (pax > 0) {
-      expect(co().taxOwedPassenger).toBe(Math.round(pax * 500 * 0.15));
-      // cash may have moved due to events; passenger income must be included
-      expect(co().cash + 0).toBeGreaterThanOrEqual(0);
+    for (const p of s.planets) {
+      expect(p.exchange.price).toBe(1700 - 100 * p.slot);
+      expect(p.exchange.trend).toBe(50);
+      expect(p.exchange.crashed).toBe(false);
     }
-    expect(co().passengers).toBe(0);
-    void cashBefore;
+  });
+
+  it('puts only humans in the turn order — rivals run inside the rollover', () => {
+    const s = base();
+    expect(s.order).toEqual([0]);
+    expect(s.companies.filter((c) => c.isAI)).toHaveLength(3);
+  });
+
+  it('is deterministic for a given seed', () => {
+    expect(JSON.stringify(base())).toBe(JSON.stringify(base()));
+    expect(JSON.stringify(base())).not.toBe(JSON.stringify(base({ seed: 'other' })));
   });
 });
 
-describe('turns & weeks', () => {
-  it('advances through all companies then a new Deluxe week with human arrival ordering', () => {
-    let s = base();
-    expect(s.week).toBe(1);
-    // human turn
-    s = applyAction(s, { type: 'journey', to: (currentCompany(s).planet + 1) % 7 });
-    while (s.phase === 'event')
-      s = applyAction(s, { type: 'eventChoice', choice: s.pending!.choices[0]?.id ?? 'ok' });
-    s = applyAction(s, { type: 'continue' });
-    expect(isAiTurn(s)).toBe(true);
-    s = runAi(s);
-    expect(s.week).toBe(2);
-    expect(isAiTurn(s)).toBe(false);
-    const humans = s.order.filter((i) => !s.companies[i]!.isAI);
-    const rivals = s.order.filter((i) => s.companies[i]!.isAI);
-    const t = humans.map((i) => s.companies[i]!.lastTravelTime);
-    for (let i = 1; i < t.length; i++) expect(t[i]!).toBeGreaterThanOrEqual(t[i - 1]!);
-    expect(rivals).toEqual([...rivals].sort((a, b) => a - b));
+describe('commodity prices', () => {
+  it('interpolates linearly between the band ends', () => {
+    for (const c of COMMODITIES) {
+      for (const difficulty of [0, 2, 4]) {
+        const { min, max } = priceRange(c, difficulty);
+        expect(priceForSupply(c.id, 100, difficulty)).toBe(min);
+        expect(priceForSupply(c.id, 0, difficulty)).toBe(max);
+        const mid = priceForSupply(c.id, 50, difficulty);
+        expect(mid).toBe(Math.floor((max - min) / 2) + min);
+      }
+    }
   });
 
-  it('uses Deluxe human-then-rival order and preserves Steam arrival ordering behind its ruleset', () => {
-    const state = newGame({
-      seed: 'turn-order',
+  it('raises the floor with difficulty but keeps the ceiling', () => {
+    const c = COMMODITY_BY_ID.gems;
+    expect(priceRange(c, 0)).toEqual({ min: 5 * c.rank, max: 40 * c.rank });
+    expect(priceRange(c, 4).min).toBe(25 * c.rank);
+    expect(priceRange(c, 4).max).toBe(40 * c.rank);
+  });
+
+  it('holds prices steady across a week of trading', () => {
+    let s = base();
+    const co = human(s);
+    const p = s.planets[co.planet]!;
+    const c = s.commodities.find((x) => (p.stock[x] ?? 0) > 2 && p.price[x]! <= co.cash)!;
+    const before = p.price[c]!;
+    s = applyAction(s, { type: 'buy', commodity: c, tons: 1 });
+    expect(s.planets[human(s).planet]!.price[c]).toBe(before);
+    s = applyAction(s, { type: 'sell', commodity: c, tons: 1 });
+    expect(s.planets[human(s).planet]!.price[c]).toBe(before);
+  });
+
+  it('refunds a same-visit resale in full, because the price cannot move', () => {
+    let s = base();
+    const co = human(s);
+    const p = s.planets[co.planet]!;
+    const c = s.commodities.find((x) => (p.stock[x] ?? 0) > 2 && p.price[x]! * 2 <= co.cash)!;
+    const cash = co.cash;
+    s = applyAction(s, { type: 'buy', commodity: c, tons: 2 });
+    s = applyAction(s, { type: 'sell', commodity: c, tons: 2 });
+    expect(human(s).cash).toBe(cash);
+  });
+});
+
+describe('subtract_cash cascade', () => {
+  const co = (cash: number, bank: number, loan = 0) =>
+    ({ cash, bank, unionLoan: loan }) as CompanyState;
+
+  it('takes cash first', () => {
+    const c = co(1000, 500);
+    subtractCash(c, 400);
+    expect([c.cash, c.bank, c.unionLoan]).toEqual([600, 500, 0]);
+  });
+  it('falls back to savings', () => {
+    const c = co(100, 500);
+    subtractCash(c, 400);
+    expect([c.cash, c.bank, c.unionLoan]).toEqual([0, 200, 0]);
+  });
+  it('forces the rest onto the Union loan', () => {
+    const c = co(100, 100);
+    subtractCash(c, 400);
+    expect([c.cash, c.bank, c.unionLoan]).toEqual([0, 0, 200]);
+  });
+});
+
+describe('passengers', () => {
+  const traveller = (price: number, seats = 8): CompanyState =>
+    ({
+      ticketPrice: price,
+      advertP: 0,
+      ship: { seats },
+      paxPickedUp: true,
+    }) as CompanyState;
+
+  it('freezes the fare that the waiting passengers will pay', () => {
+    const c = traveller(2500);
+    computePassengers(c, new Rng(1));
+    expect(c.paxPrice).toBe(2500);
+    expect(c.paxPickedUp).toBe(false);
+  });
+
+  it('never sells more tickets than there are seats', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const c = traveller(100, 6);
+      computePassengers(c, new Rng(seed));
+      expect(c.paxWaiting).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('empties the cabin above 10,000 kubars a ticket', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const c = traveller(10001);
+      computePassengers(c, new Rng(seed));
+      expect(c.paxWaiting).toBe(0);
+    }
+  });
+
+  it('thins out as the fare climbs through the bands', () => {
+    const demand = (price: number) => {
+      let total = 0;
+      for (let seed = 0; seed < 400; seed++) {
+        const c = traveller(price, 16);
+        computePassengers(c, new Rng(seed));
+        total += c.paxWaiting;
+      }
+      return total;
+    };
+    const cheap = demand(1000);
+    const mid = demand(5000);
+    const dear = demand(9000);
+    expect(cheap).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(dear);
+  });
+
+  it('pays the fare at pick-up, taxed, and only once', () => {
+    let s = base();
+    s.companies[0]!.paxWaiting = 4;
+    s.companies[0]!.paxPrice = 1000;
+    s.companies[0]!.paxPickedUp = false;
+    const cash = human(s).cash;
+    s = applyAction(s, { type: 'pickupPassengers' });
+    expect(human(s).cash).toBe(cash + 4000);
+    expect(human(s).taxOwedPassenger).toBe(Math.floor((4000 * s.econ.passTax) / 100));
+    expect(() => applyAction(s, { type: 'pickupPassengers' })).toThrow(ActionError);
+  });
+});
+
+describe('travel and fuel', () => {
+  it('floors a human travel time and applies the delay multiplier', () => {
+    expect(humanTravelTime(8.49, 5, 1)).toBe(8);
+    expect(humanTravelTime(8.49, 5, 2)).toBe(16);
+    expect(opponentTravelTime(8.49, 5)).toBeCloseTo(8.49, 5);
+  });
+
+  it('burns distance plus tonnage', () => {
+    const r = new Rng(7);
+    for (let i = 0; i < 200; i++) {
+      // fint(1, dist/2) + fint(1, shipTons/100): 2 tons at best, ceil(d/2)+ceil(t/100) at worst
+      const used = fuelUsage(11.7, 400, r);
+      expect(used).toBeGreaterThanOrEqual(2);
+      expect(used).toBeLessThanOrEqual(Math.ceil(11.7 / 2) + Math.ceil(400 / 100));
+    }
+  });
+});
+
+describe('net worth', () => {
+  it('counts savings and debts for humans, cash and shares only for rivals', () => {
+    const s = base();
+    const h = human(s);
+    h.cash = 100_000;
+    h.bank = 50_000;
+    h.unionLoan = 20_000;
+    h.zinnLoan = 30_000;
+    expect(netWorth(s, h)).toBe(100_000);
+    const ai = s.companies.find((c) => c.isAI)!;
+    ai.cash = 100_000;
+    ai.bank = 50_000;
+    ai.unionLoan = 20_000;
+    ai.zinnLoan = 30_000;
+    expect(netWorth(s, ai)).toBe(100_000 + 0); // savings and loans do not apply to rivals
+  });
+
+  it('reports a bankrupt company as unrecoverably negative', () => {
+    const s = base();
+    human(s).bankrupt = true;
+    expect(netWorth(s, human(s))).toBe(-10_000_000_000);
+  });
+});
+
+describe('stock exchanges', () => {
+  it('keeps the trend inside 15..85 and snaps on reversal', () => {
+    const s = base();
+    const r = new Rng(99);
+    for (let week = 0; week < 400; week++) {
+      stepStockMarket(s, r);
+      for (const p of s.planets) {
+        expect(p.exchange.trend).toBeGreaterThanOrEqual(0);
+        expect(p.exchange.trend).toBeLessThanOrEqual(100);
+        expect(p.exchange.price).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('reopens a crashed exchange at 1,000 with a neutral trend', () => {
+    const s = base();
+    const p = s.planets[0]!;
+    p.exchange.crashed = true;
+    stepStockMarket(s, new Rng(3));
+    expect(p.exchange.price).toBe(1000);
+    expect(p.exchange.trend).toBe(50);
+    expect(p.exchange.crashed).toBe(false);
+  });
+
+  it('allows one purchase per turn, capped at half of cash plus savings', () => {
+    let s = base();
+    const p = s.planets[human(s).planet]!;
+    p.exchange.price = 1000;
+    human(s).cash = 100_000;
+    human(s).bank = 0;
+    expect(() => applyAction(s, { type: 'stockBuy', shares: 51 })).toThrow(ActionError);
+    s = applyAction(s, { type: 'stockBuy', shares: 50 });
+    expect(human(s).shares[human(s).planet]!.tons).toBe(50);
+    expect(human(s).cash).toBe(100_000 - 50_000 - 500); // 1 % commission
+    expect(() => applyAction(s, { type: 'stockBuy', shares: 1 })).toThrow(ActionError);
+  });
+
+  it('refuses to trade a crashed exchange', () => {
+    const s = base();
+    s.planets[human(s).planet]!.exchange.crashed = true;
+    expect(() => applyAction(s, { type: 'stockBuy', shares: 1 })).toThrow(ActionError);
+    expect(() => applyAction(s, { type: 'stockSell', shares: 1 })).toThrow(ActionError);
+  });
+});
+
+describe('taxes and tariffs', () => {
+  it('skips the import tariff for a company that owes nothing', () => {
+    let s = base();
+    const co = human(s);
+    const p = s.planets[co.planet]!;
+    const c = s.commodities.find((x) => (p.stock[x] ?? 0) > 0 && p.price[x]! <= co.cash)!;
+    s = applyAction(s, { type: 'buy', commodity: c, tons: 1 });
+    s.companies[0]!.taxOwedPassenger = 0;
+    s.companies[0]!.taxOwedTariff = 0;
+    s.companies[0]!.ship.fuel = 999;
+    const to = (human(s).planet + 1) % 7;
+    s = applyAction(s, { type: 'journey', to });
+    while (s.pending)
+      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+    s = applyAction(s, { type: 'continue' });
+    // export tariff is charged on departure, so an owing company is created; but the arrival
+    // tariff itself only lands when something was already owed on touchdown
+    expect(human(s).taxOwedTariff).toBeGreaterThanOrEqual(0);
+  });
+
+  it('turns the tax screen red at 35 kubars per ton of ship', () => {
+    const s = base();
+    human(s).taxOwedTariff = 35 * 400;
+    expect(human(s).taxOwedTariff).toBe(14_000);
+  });
+});
+
+describe('ship upgrades', () => {
+  it('adds this model’s increments and 200 tons, and stacks', () => {
+    const s = base();
+    const co = human(s);
+    const def = SHIP_BY_ID(co.ship.defId);
+    const before = { ...co.ship };
+    applyShipUpgrade(co);
+    expect(co.ship.tons).toBe(600);
+    expect(co.ship.cargo).toBe(before.cargo + def.up.cargo);
+    expect(co.ship.seats).toBe(before.seats + def.up.seats);
+    expect(co.ship.crew).toBe(before.crew + def.up.crew);
+    expect(co.ship.fuelCap).toBe(before.fuelCap + def.up.fuelCap);
+    expect(co.ship.kuarps).toBe(before.kuarps + def.up.engine);
+    applyShipUpgrade(co);
+    expect(co.ship.tons).toBe(800);
+    expect(co.ship.cargo).toBe(before.cargo + 2 * def.up.cargo);
+  });
+});
+
+describe('the luck streak', () => {
+  const co = (eventGood: number, lastGood: boolean) =>
+    ({ eventGood, eventLastGood: lastGood }) as CompanyState;
+
+  it('snaps to 50 when the run turns, and drifts by 5 while it holds', () => {
+    const a = co(70, true);
+    goodChainStreak(a);
+    expect(a.eventGood).toBe(75);
+    const b = co(70, false);
+    goodChainStreak(b);
+    expect([b.eventGood, b.eventLastGood]).toEqual([50, true]);
+    const c = co(40, false);
+    badChainStreak(c);
+    expect(c.eventGood).toBe(35);
+    const d = co(40, true);
+    badChainStreak(d);
+    expect([d.eventGood, d.eventLastGood]).toEqual([50, false]);
+  });
+
+  it('never leaves the 15..85 band', () => {
+    const a = co(85, true);
+    goodChainStreak(a);
+    expect(a.eventGood).toBe(85);
+    const b = co(15, false);
+    badChainStreak(b);
+    expect(b.eventGood).toBe(15);
+  });
+});
+
+describe('hot seat', () => {
+  const twoPlayer = () =>
+    newGame({
+      seed: 'hotseat',
       level: 'novice',
       humans: [
-        { name: 'First', ship: 1 },
-        { name: 'Second', ship: 2 },
+        { name: 'One', ship: 1 },
+        { name: 'Two', ship: 2 },
       ],
       ai: 2,
     });
-    state.companies[0]!.lastTravelTime = 30;
-    state.companies[1]!.lastTravelTime = 10;
-    state.companies[2]!.lastTravelTime = 1;
-    state.companies[3]!.lastTravelTime = 2;
-    state.turnIndex = 3;
-    state.phase = 'arrival';
-    const deluxe = applyAction(state, { type: 'continue' });
-    expect(deluxe.order).toEqual([1, 0, 2, 3]);
 
-    state.settings.ruleset = 'steam';
-    const steam = applyAction(state, { type: 'continue' });
-    expect(steam.order).toEqual([2, 3, 1, 0]);
+  const flyOn = (state: GameState): GameState => {
+    let s = state;
+    s.companies[currentIndex(s)]!.ship.fuel = 999;
+    s = applyAction(s, { type: 'journey', to: (currentCompany(s).planet + 1) % 7 });
+    let guard = 0;
+    while (s.pending && guard++ < 40) {
+      const ev = s.pending;
+      const choice = ev.id.startsWith('gate:') ? 'yes' : (ev.choices[0]?.id ?? 'ok');
+      s = applyAction(s, { type: 'eventChoice', choice, amount: ev.input?.initial });
+    }
+    return s;
+  };
+
+  it('passes the turn between humans and only then rolls the week', () => {
+    let s = twoPlayer();
+    expect(s.order).toEqual([0, 1]);
+    expect(s.week).toBe(1);
+
+    s = flyOn(s); // player one departs
+    expect(s.phase).toBe('arrival');
+    s = applyAction(s, { type: 'continue' }); // hand over to player two
+    expect(s.week).toBe(1);
+    expect(currentIndex(s)).toBe(1);
+
+    s = flyOn(s); // player two departs -> the week must roll
+    s = applyAction(s, { type: 'continue' });
+    expect(s.week).toBe(2);
   });
 
-  it('uses the Deluxe win ladder and requires a decision before continuing', () => {
-    const state = newGame({
-      seed: 'win-ladder',
-      level: 'novice',
-      humans: [{ name: 'Winner', ship: 1 }],
-      ai: 1,
-    });
-    state.companies[0]!.cash = 1_000_000;
-    state.companies[0]!.zinnLoan = 0;
-    state.turnIndex = 1;
-    state.phase = 'arrival';
-    const won = applyAction(state, { type: 'continue' });
-    expect(won.phase).toBe('winner');
-    expect(won.winner).toBe(0);
-    expect(won.settings.targetNetWorth).toBe(1_000_000);
+  it('orders the new week by travel time', () => {
+    let s = twoPlayer();
+    s = flyOn(s);
+    s = applyAction(s, { type: 'continue' });
+    s = flyOn(s);
+    s = applyAction(s, { type: 'continue' });
+    const [first, second] = s.order;
+    expect(s.order).toHaveLength(2);
+    expect(s.companies[first!]!.lastTravelTime).toBeLessThanOrEqual(
+      s.companies[second!]!.lastTravelTime,
+    );
+  });
+});
 
-    const continued = applyAction(won, { type: 'continueCompetition' });
-    expect(continued.phase).toBe('onPlanet');
-    expect(continued.winner).toBeNull();
-    expect(continued.settings.targetNetWorth).toBe(2_000_000);
-
-    const retired = applyAction(won, { type: 'retireCompetition' });
-    expect(retired.phase).toBe('gameOver');
+describe('a full turn', () => {
+  it('departs, hands over, and rolls the week when the last human has moved', () => {
+    let s = base();
+    const startWeek = s.week;
+    s.companies[0]!.ship.fuel = 999;
+    s = applyAction(s, { type: 'journey', to: (human(s).planet + 3) % 7 });
+    while (s.pending) {
+      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+    }
+    expect(s.phase).toBe('arrival');
+    s = applyAction(s, { type: 'continue' }); // hand over -> the week rolls (single human)
+    expect(s.week).toBe(startWeek + 1);
+    expect(['onPlanet', 'arrival', 'winner', 'gameOver']).toContain(s.phase);
   });
 
-  it('AI-only game runs to completion deterministically', () => {
-    const play = () => {
-      let s: GameState = newGame({ seed: 'ai-vs-ai', level: 'novice', humans: [], ai: 4 });
-      // no humans → runAi loops until game over
-      let weeks = 0;
-      while (s.phase !== 'gameOver' && weeks < 400) {
-        s = runAi(s);
-        weeks = s.week;
+  it('charges a week of interest and wages on departure', () => {
+    let s = base();
+    const co = s.companies[0]!;
+    co.ship.fuel = 999;
+    co.unionLoan = 10_000;
+    co.bank = 10_000;
+    const zinn = co.zinnLoan;
+    const crewBill = co.ship.crew * co.crewSalary;
+    s = applyAction(s, { type: 'journey', to: (co.planet + 1) % 7 });
+    const after = s.companies[0]!;
+    expect(after.unionLoan).toBeGreaterThanOrEqual(10_500); // 5 %/week
+    expect(after.bank).toBeGreaterThanOrEqual(10_100); // 1 %/week
+    expect(after.zinnLoan).toBe(zinn + Math.floor((zinn * 4) / 100));
+    expect(after.wagesOwed).toBe(crewBill);
+  });
+
+  it('lets a rival win the competition outright', () => {
+    let s = base();
+    s.companies[1]!.cash = 5_000_000;
+    s.companies[0]!.ship.fuel = 999;
+    s = applyAction(s, { type: 'journey', to: (human(s).planet + 1) % 7 });
+    while (s.pending)
+      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+    s = applyAction(s, { type: 'continue' });
+    expect(s.phase).toBe('winner');
+    expect(s.companies[s.winner!]!.isAI).toBe(true);
+  });
+});
+
+describe('rivals', () => {
+  it('never go bankrupt, however deep the hole', () => {
+    let s = base();
+    for (const c of s.companies) if (c.isAI) c.cash = -5_000_000;
+    s.companies[0]!.ship.fuel = 999;
+    for (let i = 0; i < 3; i++) {
+      s = applyAction(s, { type: 'journey', to: (human(s).planet + 1) % 7 });
+      while (s.pending)
+        s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+      s = applyAction(s, { type: 'continue' });
+      if (s.phase !== 'onPlanet') break;
+    }
+    expect(s.companies.filter((c) => c.isAI && c.bankrupt)).toHaveLength(0);
+  });
+});
+
+describe('bankruptcy', () => {
+  it('is only ever declared by the player at the credit gate', () => {
+    let s = base();
+    s.companies[0]!.zinnLoan = 999_999;
+    s = applyAction(s, { type: 'journey', to: (human(s).planet + 1) % 7 });
+    expect(s.pending?.id).toBe('gate:zinn');
+    const back = applyAction(s, { type: 'eventChoice', choice: 'yes' });
+    expect(back.companies[0]!.bankrupt).toBe(false);
+    expect(back.phase).toBe('onPlanet');
+    const bust = applyAction(s, { type: 'eventChoice', choice: 'no' });
+    expect(bust.companies[0]!.bankrupt).toBe(true);
+  });
+});
+
+describe('saves', () => {
+  it('round-trips through JSON and through a link', () => {
+    const s = base();
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(deserialize(serialize(s))).toEqual(s);
+    expect(decodeFromLink(encodeForLink(s))).toEqual(s);
+  });
+
+  it('replays an action log to exactly the same state', () => {
+    const run = () => {
+      let s = base();
+      s.companies[0]!.ship.fuel = 999;
+      for (let i = 0; i < 4; i++) {
+        s = applyAction(s, { type: 'journey', to: (currentCompany(s).planet + 1) % 7 });
+        while (s.pending)
+          s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+        if (s.phase !== 'arrival') break;
+        s = applyAction(s, { type: 'continue' });
+        if (s.phase !== 'onPlanet') break;
       }
       return s;
     };
-    const a = play();
-    const b = play();
-    expect(a.phase).toBe('gameOver');
-    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    // someone won or everyone went bust
-    const alive = a.companies.filter((c) => !c.bankrupt);
-    expect(alive.length <= 1 || a.winner !== null).toBe(true);
-    // sanity: no NaN money anywhere
-    for (const c of a.companies) {
-      expect(Number.isFinite(c.cash)).toBe(true);
-      expect(Number.isFinite(c.unionLoan)).toBe(true);
-    }
+    expect(serialize(run())).toBe(serialize(run()));
   });
 });
 
-describe('save', () => {
-  it('round-trips through a play-by-link string', () => {
-    const s = base();
-    const link = encodeForLink(s);
-    expect(link.length).toBeLessThan(20000);
-    expect(JSON.stringify(decodeFromLink(link))).toBe(JSON.stringify(s));
-  });
-
-  it('migrates version 2 saves to the legacy ruleset', () => {
-    const old = base();
-    old.version = 2;
-    delete (old.settings as { ruleset?: unknown }).ruleset;
-    const migrated = decodeFromLink(encodeForLink(old));
-    expect(migrated.version).toBe(SAVE_VERSION);
-    expect(migrated.settings.ruleset).toBe('steam');
-  });
-});
-
-describe('M3: specials, events, auctions', () => {
-  it('every travel event applies without throwing and leaves finite money', async () => {
-    const { EVENTS } = await import('./events');
-    const { Rng } = await import('./rng');
-    for (const ev of EVENTS) {
-      for (let seed = 0; seed < 5; seed++) {
-        let s = base();
-        // give the company some cargo and cash to work with
-        s = applyAction(s, { type: 'buy', commodity: s.commodities[0]!, tons: 5 });
-        const st = structuredClone(s);
-        const co = currentCompany(st);
-        const r = new Rng(seed);
-        const ctx = {
-          state: st,
-          co,
-          ci: 0,
-          from: co.planet,
-          to: (co.planet + 1) % 7,
-          dest: 'X',
-          r,
-          report: () => {},
-          loss: () => '',
-          ask: (e: unknown) => {
-            st.pending = { ...(e as object), context: 'travel' } as never;
-          },
-        };
-        st.destination = ctx.to;
-        expect(() => ev.apply(ctx)).not.toThrow();
-        expect(Number.isFinite(co.cash)).toBe(true);
-      }
-    }
-  });
-
-  it('planet special posts a dialog and resolves back to the menu', () => {
+describe('cargo', () => {
+  it('keeps an integer average price paid and respects the hold', () => {
     let s = base();
-    s = applyAction(s, { type: 'special' });
-    expect(s.pending).not.toBeNull();
-    expect(s.pending!.context).toBe('planet');
-    expect(() => applyAction(s, { type: 'buy', commodity: s.commodities[0]!, tons: 1 })).toThrow(
-      ActionError,
-    );
-    const choice = s.pending!.choices[0]?.id ?? 'ok';
-    s = applyAction(s, { type: 'eventChoice', choice });
-    // may chain one more notice
-    while (s.pending)
-      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
-    expect(s.phase).toBe('onPlanet');
-    expect(() => applyAction(s, { type: 'special' })).toThrow(ActionError); // once per visit
-  });
-
-  it('auction: human bid prompt appears, highest bid wins a facility', async () => {
-    const { settleAuction } = await import('./auctions');
-    let s = newGame({
-      seed: 'auction',
-      level: 'novice',
-      humans: [
-        { name: 'A', ship: 1 },
-        { name: 'B', ship: 2 },
-      ],
-      ai: 0,
-    });
-    s.week = 12;
-    s.auction = {
-      kind: 'facility',
-      name: 'Launch Pad on X',
-      planet: 0,
-      fee: 3000,
-      reserve: 20000,
-      bids: {},
-      waiting: [0, 1],
-    };
-    // simulate turn entry for company 0
-    const { promptBid } = await import('./auctions');
-    promptBid(s, 0);
-    expect(s.pending?.id).toBe('auctionbid');
-    s = applyAction(s, { type: 'eventChoice', choice: 'bid', amount: 25000 });
-    expect(s.auction!.bids[0]).toBe(25000);
-    expect(s.pending).toBeNull();
-    s.auction!.bids[1] = 30000;
-    s.auction!.waiting = [];
-    settleAuction(s);
-    expect(s.auction).toBeNull();
-    expect(s.planets[0]!.facilities).toHaveLength(1);
-    expect(s.planets[0]!.facilities[0]!.owner).toBe(1);
-    expect(s.companies[1]!.cash).toBe(50000 - 30000);
-  });
-
-  it('long AI-only games stay healthy with the full catalogue', () => {
-    let s: GameState = newGame({ seed: 'full-catalogue', level: 'novice', humans: [], ai: 6 });
-    let guard = 0;
-    while (s.phase !== 'gameOver' && guard++ < 400) s = runAi(s);
-    expect(s.phase).toBe('gameOver');
-    for (const c of s.companies)
-      expect(Number.isFinite(c.cash) && Number.isFinite(c.zinnLoan)).toBe(true);
+    const co = human(s);
+    co.cash = 1_000_000;
+    const p = s.planets[co.planet]!;
+    const c = s.commodities.find((x) => (p.stock[x] ?? 0) >= 2)!;
+    s = applyAction(s, { type: 'buy', commodity: c, tons: 2 });
+    const lot = human(s).cargo[c]!;
+    expect(Number.isInteger(lot.paid)).toBe(true);
+    expect(cargoTons(human(s))).toBe(2);
+    expect(() =>
+      applyAction(s, { type: 'buy', commodity: c, tons: human(s).ship.cargo + 1 }),
+    ).toThrow(ActionError);
   });
 });

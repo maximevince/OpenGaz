@@ -31,5 +31,6 @@ assets-original/
 .env
 .env.*
 
-# local research dumps (third-party text/screens) — not part of the repo
+# local research dumps and working notes — not part of the repo
 docs/reference/
+docs/DESIGN.md
