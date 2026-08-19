@@ -42,6 +42,32 @@ export function facilityName(
   return `${base} on ${PLANET_BY_ID[state.planets[a.planet]!.id].name}`;
 }
 
+/** One row per company for the facilities chart: how many it owns on this planet, and what they earn. */
+export interface FacilityHolding {
+  company: number;
+  count: number;
+  /** total landing fee every other company pays on each visit */
+  fee: number;
+  /** fees banked on the planet, waiting for the owner to land */
+  revenue: number;
+}
+
+/**
+ * What each company owns on one planet. Facilities are stored per planet, so this folds them
+ * back into the per-owner totals the chart shows. Companies owning nothing are included.
+ */
+export function facilityHoldings(state: GameState, planet: number): FacilityHolding[] {
+  const rows = state.companies.map((_, company) => ({ company, count: 0, fee: 0, revenue: 0 }));
+  for (const f of state.planets[planet]?.facilities ?? []) {
+    const row = rows[f.owner];
+    if (!row) continue; // owner -1 = seized on bankruptcy
+    row.count++;
+    row.fee += f.fee;
+    row.revenue += f.revenue;
+  }
+  return rows;
+}
+
 function humanCount(state: GameState): number {
   return state.companies.filter((c) => !c.isAI && !c.bankrupt).length;
 }

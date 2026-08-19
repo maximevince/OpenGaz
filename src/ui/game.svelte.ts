@@ -42,6 +42,7 @@ export type Screen =
   | 'fuel'
   | 'file'
   | 'map'
+  | 'charts'
   | 'travel'
   | 'event'
   | 'arrival'

@@ -10,11 +10,8 @@ export function deserialize(json: string): GameState {
   if (typeof s !== 'object' || s === null) {
     throw new Error(`unsupported save version ${(s as { version?: unknown })?.version}`);
   }
-  if (s.version === 2) {
-    // Version 2 predates rulesets. Preserve its previously shipped behavior for existing saves.
-    s.version = SAVE_VERSION;
-    s.settings.ruleset = 'steam';
-  }
+  // No migrations: an older save is missing fields the current engine needs, and stamping the
+  // new version onto it produces a silently broken game. Reject it and start over instead.
   if (s.version !== SAVE_VERSION) throw new Error(`unsupported save version ${s.version}`);
   return s;
 }
