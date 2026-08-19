@@ -9,3 +9,6 @@ project artwork; no LavaMind artwork is included.
 | `src/gfx/screen/title.png`                                                                                               | OpenGaz title-screen background               | CC BY-SA 4.0                                |
 | `src/gfx/planet/{vexx,zile,stye,frac,bass,hork,xeen,pyke,nosh,loro,mira,ooom,tilo,queg}/{large,medium,icon,surface}.png` | Planet orbital, map/picker and surface views  | CC BY-SA 4.0                                |
 | `src/gfx/ship/{1-12}/{picture,icon}.png`                                                                                 | Ship dealer artwork and picker icons          | CC BY-SA 4.0                                |
+| `src/gfx/bg/stars/1.png`                                                                                                 | Journey map background                        | CC BY-SA 4.0                                |
+| `src/gfx/screen/{win,lose}.png`                                                                                          | Victory and loss screen backgrounds           | CC BY-SA 4.0                                |
+| `src/gfx/portrait/op{1-6}.png`                                                                                           | Rival-company creature cards                  | CC BY-SA 4.0                                |

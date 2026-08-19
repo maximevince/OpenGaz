@@ -1,6 +1,7 @@
 {
   "pack": "opengaz",
   "gfx": [
+    "bg/stars/1",
     "planet/bass/icon",
     "planet/bass/large",
     "planet/bass/medium",
@@ -57,7 +58,15 @@
     "planet/zile/large",
     "planet/zile/medium",
     "planet/zile/surface",
+    "portrait/op1",
+    "portrait/op2",
+    "portrait/op3",
+    "portrait/op4",
+    "portrait/op5",
+    "portrait/op6",
+    "screen/lose",
     "screen/title",
+    "screen/win",
     "ship/1/icon",
     "ship/1/picture",
     "ship/10/icon",
