@@ -12,9 +12,12 @@
 <div class="title" style:background-image={bg ? `url(${bg})` : undefined}>
   {#if !bg}
     <div class="stars"></div>
-    <h1>OpenGaz</h1>
-    <p class="sub">an open-source homage to Gazillionaire Deluxe</p>
   {/if}
+  <div class="title-lockup" aria-label="OpenGaz Deluxe">
+    <h1>Open<span>Gaz</span></h1>
+    <div class="deluxe">DELUXE</div>
+    <p class="sub">an open-source space-trading game</p>
+  </div>
   <div class="menu">
     <Btn onclick={() => game.go('setup')}>New Game</Btn>
     <Btn disabled={!hasAuto} onclick={() => game.loadAutosave()}>Continue last game</Btn>
@@ -50,21 +53,54 @@
       radial-gradient(1px 1px at 10% 70%, #aaa 50%, transparent 51%);
     background-size: 160px 120px;
   }
-  h1 {
+  .title-lockup {
     position: relative;
-    margin: 90px 0 0;
+    z-index: 1;
+    margin: 28px auto 0;
+    width: max-content;
+    min-width: 360px;
+    padding: 4px 22px 8px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, transparent, #02040dbb 18%, #02040dbb 82%, transparent);
+  }
+  h1 {
+    margin: 0;
     font:
-      bold 64px/1 Georgia,
-      'Times New Roman',
-      serif;
-    letter-spacing: 2px;
-    text-shadow: 0 0 12px #8080ff;
+      900 62px/0.85 Impact,
+      Haettenschweiler,
+      'Arial Narrow Bold',
+      sans-serif;
+    font-style: italic;
+    letter-spacing: 3px;
+    color: #f5fbff;
+    text-shadow:
+      3px 3px 0 #152251,
+      -1px -1px 0 #9cecff,
+      0 0 12px #4da6ff;
+  }
+  h1 span {
+    color: #ffd45c;
+    text-shadow:
+      3px 3px 0 #6b3514,
+      -1px -1px 0 #fff1a6,
+      0 0 12px #ff9d31;
+  }
+  .deluxe {
+    margin-top: 3px;
+    font:
+      700 19px/1 Arial,
+      sans-serif;
+    letter-spacing: 10px;
+    color: #94e9ff;
+    text-indent: 10px;
+    text-shadow: 0 0 8px #409dff;
   }
   .sub {
     position: relative;
-    margin: 8px 0 0;
-    font-size: 16px;
-    color: #c0c0ff;
+    margin: 5px 0 0;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #c6dbff;
   }
   .menu {
     position: absolute;
