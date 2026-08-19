@@ -26,7 +26,11 @@
         <label class="inp">
           {ev.input.label}:
           <input type="number" min={ev.input.min} max={ev.input.max} bind:value={amount} />
-          <span class="hint">(cash {fmt(ev.input.max)})</span>
+          <span class="hint">
+            you have {fmt(game.co.cash)}{ev.input.max < 1e10
+              ? ` · at most ${fmt(ev.input.max)}`
+              : ''}
+          </span>
         </label>
       {/if}
       <div class="row">
