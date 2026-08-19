@@ -34,3 +34,6 @@ assets-original/
 # local research dumps and working notes — not part of the repo
 docs/reference/
 docs/DESIGN.md
+
+# local tooling scratch space (agent worktrees, session state)
+.claude/
