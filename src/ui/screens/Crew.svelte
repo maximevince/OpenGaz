@@ -19,7 +19,6 @@
       color={co.wagesOwed > 0 ? 'yellow' : 'cyan'}
     />
     <Plate label="Cash:" value={fmt(co.cash)} />
-    {#if co.onStrike}<Plate label="YOUR CREW IS ON STRIKE" color="yellow" />{/if}
   {/snippet}
   {#snippet extra()}
     <div class="warn">

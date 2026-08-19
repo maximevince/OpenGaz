@@ -16,7 +16,7 @@
   const pname = $derived(PLANET_BY_ID[game.planet.id].name);
   const wh = $derived(co.warehouse[pi] ?? {});
   const used = $derived(warehouseTons(co, pi));
-  const cap = $derived(co.warehouseCap[pi] ?? 0);
+  const cap = $derived(co.warehouseSpace);
   let prompt: { mode: 'store' | 'retrieve'; c: CommodityId; max: number } | null = $state(null);
 </script>
 

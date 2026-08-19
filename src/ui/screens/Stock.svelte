@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ECON, PLANET_BY_ID } from '../../engine';
+  import { PLANET_BY_ID } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import Prompt from '../components/Prompt.svelte';
   import { fmt } from '../format';
@@ -13,9 +13,7 @@
   const local = $derived(pi === co.planet);
   const lot = $derived(co.shares[pi]);
   const maxBuy = $derived(
-    ex.closedFor > 0 || co.stockBoughtThisWeek
-      ? 0
-      : Math.floor((co.cash * ECON.stockWeeklyCashCap) / (ex.price * (1 + ECON.brokerFee))),
+    ex.crashed || co.stockBoughtThisWeek ? 0 : Math.floor((0.5 * (co.cash + co.bank)) / ex.price),
   );
   let mode: 'buy' | 'sell' | null = $state(null);
 
@@ -74,7 +72,7 @@
     <div class="ex">{PLANET_BY_ID[p.id].exchange}</div>
     <div class="sub">Planetary Stock Market</div>
     <div class="kv">
-      Current Price: <b>{ex.closedFor > 0 ? 'CLOSED (crashed)' : fmt(ex.price)}</b>
+      Current Price: <b>{ex.crashed ? 'CLOSED (crashed)' : fmt(ex.price)}</b>
     </div>
     <div class="kv">Price You Paid: <b>{lot ? fmt(lot.paid) : 0}</b></div>
     <div class="kv">Your Stock: <b>{lot?.tons ?? 0} shares</b></div>
@@ -91,7 +89,7 @@
   <div class="buttons">
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
     <Btn onclick={() => (mode = 'buy')} disabled={!local || maxBuy <= 0}>Buy</Btn>
-    <Btn onclick={() => (mode = 'sell')} disabled={!local || !lot || ex.closedFor > 0}>Sell</Btn>
+    <Btn onclick={() => (mode = 'sell')} disabled={!local || !lot || ex.crashed}>Sell</Btn>
     <Btn onclick={() => (view = (pi + 1) % s.planets.length)}>Show Next</Btn>
     <Btn onclick={() => (view = -1)}>Show Local</Btn>
     <Btn onclick={() => game.go('money')}>Show Shares</Btn>

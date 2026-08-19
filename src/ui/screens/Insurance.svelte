@@ -9,7 +9,7 @@
 
 <ServiceScreen portrait="insurance" caption="Insurance Agent" title="Voyager's Insurance Company">
   {#snippet plates()}
-    <Plate label="Premium (next trip):" value={fmt(co.insurancePremium)} />
+    <Plate label="Premium (next trip):" value={fmt(co.insuranceCost)} />
     <Plate
       label="Status:"
       value={co.insured ? 'INSURED for the next trip' : 'Not insured'}
@@ -27,7 +27,7 @@
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
     <Btn
       onclick={() => game.dispatch({ type: 'buyInsurance' })}
-      disabled={co.insured || co.cash < co.insurancePremium}>Purchase Voyager's Insurance</Btn
+      disabled={co.insured || co.cash < co.insuranceCost}>Purchase Voyager's Insurance</Btn
     >
     <Btn onclick={() => game.help()}>Help</Btn>
   {/snippet}

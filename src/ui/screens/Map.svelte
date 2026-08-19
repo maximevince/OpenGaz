@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MAP_SLOTS, PLANET_BY_ID, distanceBetween, fuelUsage, travelTime } from '../../engine';
+  import { MAP_SLOTS, PLANET_BY_ID, distanceBetween, humanTravelTime } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
@@ -16,9 +16,8 @@
   const stars = img('bg.stars.1');
   const worst = (to: number) => {
     const d = distanceBetween(s, co.planet, to);
-    return Math.ceil(d / 2) + Math.ceil((400 * co.ship.klass) / 100);
+    return Math.floor(d / 2) + Math.floor(co.ship.tons / 100);
   };
-  void fuelUsage;
 </script>
 
 <div class="map" style:background-image={stars ? `url(${stars})` : undefined}>
@@ -43,9 +42,12 @@
   <div class="galaxy">✦</div>
   <div class="info">
     {#if hover !== null && hover !== co.planet}
-      {PLANET_BY_ID[s.planets[hover]!.id].name}: {distanceBetween(s, co.planet, hover)} million kuters
-      · ~{travelTime(s, co.planet, hover, co.ship.kuarps).toFixed(1)} days · up to {worst(hover)} t fuel
-      (tank {co.ship.fuel} t)
+      {PLANET_BY_ID[s.planets[hover]!.id].name}: {distanceBetween(s, co.planet, hover).toFixed(1)} million
+      kuters · ~{humanTravelTime(
+        distanceBetween(s, co.planet, hover),
+        co.ship.kuarps,
+        co.travelDelayed,
+      )} days · up to {worst(hover)} t fuel (tank {co.ship.fuel} t)
     {:else}
       You are on {PLANET_BY_ID[game.planet.id].name}. Click a planet to travel there. Week {s.week}.
     {/if}
@@ -63,12 +65,11 @@
         <div class="dlg-title">Journey to {PLANET_BY_ID[s.planets[d]!.id].name}?</div>
         <div class="dlg-body">
           <p>
-            {distanceBetween(s, co.planet, d)} million kuters · about {travelTime(
-              s,
-              co.planet,
-              d,
+            {distanceBetween(s, co.planet, d).toFixed(1)} million kuters · about {humanTravelTime(
+              distanceBetween(s, co.planet, d),
               co.ship.kuarps,
-            ).toFixed(1)} days at {co.ship.kuarps} kuarps.
+              co.travelDelayed,
+            )} days at {co.ship.kuarps} kuarps.
           </p>
           <p>
             Fuel needed: up to {worst(d)} t (you have {co.ship.fuel} t){co.ship.fuel < worst(d)

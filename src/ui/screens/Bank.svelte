@@ -3,7 +3,7 @@
   import Plate from '../components/Plate.svelte';
   import Prompt from '../components/Prompt.svelte';
   import ServiceScreen from '../components/ServiceScreen.svelte';
-  import { fmt, pct } from '../format';
+  import { fmt } from '../format';
   import { game } from '../game.svelte';
   const co = $derived(game.co);
   let mode: 'deposit' | 'withdraw' | null = $state(null);
@@ -12,12 +12,9 @@
 <ServiceScreen portrait="bank" caption="Bank Manager" title="Trader's Union Bank">
   {#snippet plates()}
     <Plate label="Savings Account:" value={fmt(co.bank)} />
-    <Plate label="Interest Rate:" value={`${pct(co.bankRate)} per week`} />
+    <Plate label="Interest Rate:" value={`${co.savingsRate}% per week`} />
     <Plate label="Cash:" value={fmt(co.cash)} />
-    <Plate
-      label="Interest Earned (last week):"
-      value={fmt(Math.round(co.bank - co.bank / (1 + co.bankRate)))}
-    />
+    <Plate label="Interest Earned (last week):" value={fmt(co.savingsInterest)} />
   {/snippet}
   {#snippet buttons()}
     <Btn onclick={() => game.go('menu')}>Continue</Btn>

@@ -12,9 +12,7 @@ import {
   decodeFromLink,
   deserialize,
   encodeForLink,
-  isAiTurn,
   newGame,
-  runAi,
   serialize,
   type Action,
   type GameState,
@@ -175,7 +173,7 @@ class GameStore {
 
   /** Route to the right screen after the state changed, run AI turns, autosave. */
   private afterChange() {
-    let s = this.s;
+    const s = this.s;
     if (s.phase === 'gameOver' || s.phase === 'winner') {
       this.state = s;
       this.screen = 'gameover';
@@ -184,7 +182,7 @@ class GameStore {
       this.autosave();
       return;
     }
-    if (online.active && !online.ownsCompany(currentIndex(s)) && !isAiTurn(s)) {
+    if (online.active && !online.ownsCompany(currentIndex(s))) {
       // someone else's turn: spectate
       this.shownCompany = currentIndex(s);
       this.screen = 'waiting';
@@ -197,20 +195,11 @@ class GameStore {
       this.autosave();
       return;
     }
-    if (s.phase === 'arrival' && !isAiTurn(s)) {
+    if (s.phase === 'arrival') {
       if (this.screen !== 'arrival') play('arrive');
       this.screen = 'arrival';
       this.autosave();
       return;
-    }
-    if (isAiTurn(s)) {
-      s = runAi(s);
-      this.state = s;
-      if (s.phase === 'gameOver' || s.phase === 'winner') {
-        this.screen = 'gameover';
-        this.autosave();
-        return;
-      }
     }
     // human on planet
     const ci = currentIndex(s);

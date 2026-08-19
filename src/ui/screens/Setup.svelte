@@ -136,11 +136,15 @@
         <div class="dlg-title">Choose a ship for {humans[shipPick]!.name}</div>
         {#if selectedShipDef}
           <div class="dealer-preview">
-            {#if selectedShipPicture}<img src={selectedShipPicture} alt={selectedShipDef.name} />{/if}
+            {#if selectedShipPicture}<img
+                src={selectedShipPicture}
+                alt={selectedShipDef.name}
+              />{/if}
             <div>
               <b>{selectedShipDef.name}</b>
               <span
-                >{selectedShipDef.cargo}t cargo · {selectedShipDef.seats} passengers · {selectedShipDef.fuel}t fuel · {selectedShipDef.kuarps} kuarps</span
+                >{selectedShipDef.cargo}t cargo · {selectedShipDef.seats} passengers · {selectedShipDef.fuel}t
+                fuel · {selectedShipDef.kuarps} kuarps</span
               >
             </div>
           </div>

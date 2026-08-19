@@ -21,50 +21,50 @@ export type CommodityId =
 export interface CommodityDef {
   id: CommodityId;
   name: string;
-  /** rank 1..18 — min price = 5*rank, max = 8*min */
+  /** linear index k = 1..18 — price band pMin=(difficulty+1)*5*k .. pMax=40*k */
   rank: number;
-  /** is it perishable/agricultural (affected by harvest news)? */
-  agri: boolean;
+  /** category 0 agricultural / 1 manufactured / 2 raw */
+  cat: 0 | 1 | 2;
 }
 
-const defs: [CommodityId, string, boolean][] = [
-  ['cantaloupe', 'Cantaloupe', true],
-  ['jellybeans', 'Jelly Beans', false],
-  ['moonferns', 'Moon Ferns', true],
-  ['froglegs', 'Frog Legs', true],
-  ['whipcream', 'Whip Cream', true],
-  ['babelseeds', 'Babel Seeds', true],
-  ['diapers', 'Diapers', false],
-  ['umbrellas', 'Umbrellas', false],
-  ['toasters', 'Toasters', false],
-  ['polyester', 'Polyester', false],
-  ['hairtonic', 'Hair Tonic', false],
-  ['lavalamps', 'Lava Lamps', false],
-  ['oxygen', 'Oxygen', false],
-  ['ogglesand', 'Oggle Sand', false],
-  ['kryptoons', 'Kryptoons', false],
-  ['xfuels', 'X Fuels', false],
-  ['gems', 'Gems', false],
-  ['exotic', 'Exotic', false],
+const defs: [CommodityId, string][] = [
+  ['cantaloupe', 'Cantaloupe'],
+  ['jellybeans', 'Jelly Beans'],
+  ['moonferns', 'Moon Ferns'],
+  ['froglegs', 'Frog Legs'],
+  ['whipcream', 'Whip Cream'],
+  ['babelseeds', 'Babel Seeds'],
+  ['diapers', 'Diapers'],
+  ['umbrellas', 'Umbrellas'],
+  ['toasters', 'Toasters'],
+  ['polyester', 'Polyester'],
+  ['hairtonic', 'Hair Tonic'],
+  ['lavalamps', 'Lava Lamps'],
+  ['oxygen', 'Oxygen'],
+  ['ogglesand', 'Oggle Sand'],
+  ['kryptoons', 'Kryptoons'],
+  ['xfuels', 'X Fuels'],
+  ['gems', 'Gems'],
+  ['exotic', 'Exotic'],
 ];
 
-export const COMMODITIES: readonly CommodityDef[] = defs.map(([id, name, agri], i) => ({
+export const COMMODITIES: readonly CommodityDef[] = defs.map(([id, name], i) => ({
   id,
   name,
   rank: i + 1,
-  agri,
+  cat: Math.floor(i / 6) as 0 | 1 | 2,
 }));
 
 export const COMMODITY_BY_ID: Record<CommodityId, CommodityDef> = Object.fromEntries(
   COMMODITIES.map((c) => [c.id, c]),
 ) as Record<CommodityId, CommodityDef>;
 
-export function priceRange(c: CommodityDef): { min: number; max: number } {
-  const min = 5 * c.rank;
-  return { min, max: 8 * min };
+/** ids in a category, in rank order */
+export function commoditiesInCat(cat: 0 | 1 | 2): CommodityId[] {
+  return COMMODITIES.filter((c) => c.cat === cat).map((c) => c.id);
 }
 
-/** Typical tons available on a planet at 100 % supply: cheap goods plentiful, exotic scarce. */
-export function baseAvailability(c: CommodityDef): number {
-  return Math.round(150 - (140 * (c.rank - 1)) / 17); // 150 .. 10
+/** Price band at a difficulty: min=(difficulty+1)*5*k, max=40*k. */
+export function priceRange(c: CommodityDef, difficulty: number): { min: number; max: number } {
+  return { min: (difficulty + 1) * 5 * c.rank, max: 40 * c.rank };
 }

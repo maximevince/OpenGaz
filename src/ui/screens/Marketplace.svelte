@@ -3,6 +3,7 @@
     COMMODITY_BY_ID,
     PLANET_BY_ID,
     cargoTons,
+    levelOf,
     priceRange,
     type CommodityId,
   } from '../../engine';
@@ -69,7 +70,7 @@
     <tbody>
       {#each game.s.commodities as c (c)}
         {@const def = COMMODITY_BY_ID[c]}
-        {@const range = priceRange(def)}
+        {@const range = priceRange(def, levelOf(game.s).difficulty)}
         <tr class:sel={sel === c} onclick={() => open(c)}>
           <td class="name">{def.name}</td>
           <td>{co.cargo[c]?.tons ?? 0}</td>

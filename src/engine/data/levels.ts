@@ -1,95 +1,78 @@
 export type Level = 'tutorial' | 'novice' | 'beginner' | 'intermediate' | 'expert' | 'master';
 
+/** Difficulty presets. Levels 1..6. */
 export interface LevelDef {
   id: Level;
   name: string;
+  /** price-band difficulty 0..4 (levels 1-2 share 0) — raises the price floor */
+  difficulty: number;
   startCash: number;
-  shipPrice: number; // financed by Mr. Zinn
-  targetNetWorth: number;
-  /** trade margin squeeze 0..1 (higher = narrower spreads) */
-  squeeze: number;
-  aiIq: number; // 0..1 default opponent intelligence
+  /** starting debt to Mr. Zinn = the ship's financed price */
+  zinnDebt: number;
+  /** starting good-event probability */
+  eventGood: number;
+  /** per-trip floor applied to eventGood (levels 1-2 only) */
+  eventGoodFloor: number;
+  /** opponent iQ % — cargo-quantity factor */
+  opponentIq: number;
+  tutor: boolean;
 }
 
 export const LEVELS: readonly LevelDef[] = [
-  {
-    id: 'tutorial',
-    name: 'Tutorial',
-    startCash: 50000,
-    shipPrice: 100000,
-    targetNetWorth: 1000000,
-    squeeze: 0.0,
-    aiIq: 0.2,
-  },
-  {
-    id: 'novice',
-    name: 'Novice',
-    startCash: 50000,
-    shipPrice: 110000,
-    targetNetWorth: 2000000,
-    squeeze: 0.1,
-    aiIq: 0.35,
-  },
-  {
-    id: 'beginner',
-    name: 'Beginner',
-    startCash: 50000,
-    shipPrice: 120000,
-    targetNetWorth: 3000000,
-    squeeze: 0.2,
-    aiIq: 0.5,
-  },
-  {
-    id: 'intermediate',
-    name: 'Intermediate',
-    startCash: 50000,
-    shipPrice: 130000,
-    targetNetWorth: 4000000,
-    squeeze: 0.3,
-    aiIq: 0.65,
-  },
-  {
-    id: 'expert',
-    name: 'Expert',
-    startCash: 50000,
-    shipPrice: 140000,
-    targetNetWorth: 5000000,
-    squeeze: 0.4,
-    aiIq: 0.8,
-  },
-  {
-    id: 'master',
-    name: 'Master',
-    startCash: 50000,
-    shipPrice: 150000,
-    targetNetWorth: 7500000,
-    squeeze: 0.5,
-    aiIq: 1.0,
-  },
+  // level:            diff cash    zinn     eG  floor iq
+  mk('tutorial', 'Tutorial', 0, 50000, 100000, 85, 45, 50, true),
+  mk('novice', 'Novice', 0, 25000, 110000, 75, 35, 75, false),
+  mk('beginner', 'Beginner', 1, 0, 120000, 65, 0, 100, false),
+  mk('intermediate', 'Intermediate', 2, 0, 130000, 55, 0, 125, false),
+  mk('expert', 'Expert', 3, 0, 140000, 50, 0, 150, false),
+  mk('master', 'Master', 4, 0, 150000, 50, 0, 175, false),
 ];
 
-export const LEVEL_BY_ID = (id: Level): LevelDef => LEVELS.find((l) => l.id === id)!;
+function mk(
+  id: Level,
+  name: string,
+  difficulty: number,
+  startCash: number,
+  zinnDebt: number,
+  eventGood: number,
+  eventGoodFloor: number,
+  opponentIq: number,
+  tutor: boolean,
+): LevelDef {
+  return {
+    id,
+    name,
+    difficulty,
+    startCash,
+    zinnDebt,
+    eventGood,
+    eventGoodFloor,
+    opponentIq,
+    tutor,
+  };
+}
 
-/** Global economy constants (Novice baseline; some are modified by news/specials at runtime). */
+export const LEVEL_BY_ID = (id: Level): LevelDef => LEVELS.find((l) => l.id === id)!;
+export const LEVEL_INDEX = (id: Level): number => LEVELS.findIndex((l) => l.id === id);
+
+/** Global economy constants. Rates are integer percent per week. */
 export const ECON = {
-  bankRate: 0.01,
-  unionRate: 0.05,
-  unionLimit: 100000,
-  zinnRate: 0.04,
-  zinnLimit: 200000,
-  importTariff: 0.03,
-  exportTariff: 0.02,
-  passengerTax: 0.15,
+  savingsRate: 1, // bank interest %/wk (1..3)
+  loanRate: 5, // Trader's Union %/wk
+  loanMax: 100000,
+  zinnRate: 4, // %/wk
+  zinnMax: 200000,
+  importTariff: 3, // % (bounds 1..15)
+  exportTariff: 2, // % (bounds 1..15)
+  passTax: 15, // % (bounds 0..50)
   crewSalary: 1500,
   ticketMin: 100,
-  ticketMax: 10000,
   ticketDefault: 1000,
-  fuelPriceMin: 100,
-  fuelPriceMax: 1000,
-  brokerFee: 0.01,
-  stockWeeklyCashCap: 0.5,
-  freeWarehouseTons: 50,
-  facilityAuctionsFromWeek: 11,
+  fuelPriceRange: 200, // planet fuel price = fint(range, range*10)
+  insurancePriceRange: 15, // premium = fint(range, range*1000)
+  warehouseSpace: 50, // tons, one scalar for every planet
+  brokerFee: 1, // % on stock trades
+  /** ad level base costs; actual cost = floor(base * shipTons / 400) */
   adTiers: [0, 1000, 2000, 3000, 4000, 5000, 10000] as const,
   adTierNames: ['None', 'Fliers', 'Newspaper', 'Magazine', 'Radio', 'TV', 'Everything'] as const,
 } as const;

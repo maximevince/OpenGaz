@@ -2,7 +2,7 @@
   import Btn from '../components/Btn.svelte';
   import Plate from '../components/Plate.svelte';
   import ServiceScreen from '../components/ServiceScreen.svelte';
-  import { fmt, pct } from '../format';
+  import { fmt } from '../format';
   import { game } from '../game.svelte';
   const co = $derived(game.co);
   const total = $derived(co.taxOwedPassenger + co.taxOwedTariff);
@@ -17,7 +17,7 @@
     <Plate label="Cash:" value={fmt(co.cash)} />
     <Plate
       label="Rates:"
-      value={`pax ${pct(e.passengerTax)} · import ${pct(e.importTariff)} · export ${pct(e.exportTariff)}`}
+      value={`pax ${e.passTax}% · import ${e.importTariff}% · export ${e.exportTariff}%`}
     />
   {/snippet}
   {#snippet buttons()}

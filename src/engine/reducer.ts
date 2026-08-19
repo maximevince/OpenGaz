@@ -1,29 +1,51 @@
-import { COMMODITY_BY_ID } from './data/commodities';
+/**
+ * The deterministic rules engine: `applyAction(state, action) -> state`.
+ *
+ * Structure follows the original's turn machine: a human acts on a planet, picks a
+ * destination, runs the departure pipeline, and hands over. When every human has moved the week rolls
+ * over: the six rivals take their scripted turns, then the world updates.
+ */
+import { COMMODITY_BY_ID, type CommodityId } from './data/commodities';
 import { ECON, LEVEL_BY_ID } from './data/levels';
 import { PLANET_BY_ID } from './data/planets';
+import { moveOpponents, runOpponents } from './ai';
+import { auctionReportFor, recordBid, runAuctionWeek } from './auctions';
 import {
-  adSpend,
+  adCost,
+  cargoMarketValue,
   cargoTons,
-  cargoValue,
+  computePassengers,
   distanceBetween,
+  fmt,
   fuelUsage,
-  insurancePremium,
+  humanTravelTime,
   netWorth,
-  nudgeSupply,
-  passengersWaiting,
-  priceForSupply,
-  refreshPlanetPrices,
-  rollPassengerDemand,
-  shipTons,
-  stockForSupply,
-  travelTime,
+  pushLog,
+  rollInsuranceCost,
+  subtractCash,
   warehouseTons,
 } from './economy';
+import {
+  applyEventGoodFloor,
+  badChainStreak,
+  beginEventRoll,
+  endChainStreak,
+  resolveTravelEvent,
+} from './events';
 import { Rng } from './rng';
-import { resolveEventChoice, rollTravelEvents } from './events';
-import { resolveSpecialChoice, startSpecial } from './specials';
-import { maybeStartAuction, promptBid, recordBid, settleAuction } from './auctions';
 import { nextWinningPoint } from './rulesets';
+import { resolveSpecialChoice, startSpecial } from './specials';
+import {
+  commodityAvailable,
+  commodityPrice,
+  economicChange,
+  gameEvents,
+  opponentEvents,
+  rollFuelPrices,
+  rollNewsEvent,
+  rollWeather,
+  stepStockMarket,
+} from './world';
 import {
   ActionError,
   type Action,
@@ -46,17 +68,12 @@ export function currentCompany(state: GameState): CompanyState {
 }
 
 function log(state: GameState, company: number, kind: LogEntry['kind'], text: string): LogEntry {
-  const e: LogEntry = { week: state.week, company, kind, text };
-  state.log.push(e);
-  if (state.log.length > 400) state.log.splice(0, state.log.length - 400);
-  return e;
+  return pushLog(state, { week: state.week, company, kind, text });
 }
 
 function report(state: GameState, kind: LogEntry['kind'], text: string): void {
   state.arrivalReports.push(log(state, currentIndex(state), kind, text));
 }
-
-const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 
 function need(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new ActionError(msg);
@@ -67,13 +84,11 @@ function posInt(n: number, what: string): number {
   return Math.floor(n);
 }
 
-/** Take money; if cash is short, the Trader's Union auto-lends the difference (mandatory costs only). */
+/** cash -> savings -> forced Union loan, with a note when the Union had to step in. */
 function forcePay(state: GameState, co: CompanyState, amount: number, why: string): void {
-  co.cash -= amount;
-  if (co.cash < 0) {
-    const short = -co.cash;
-    co.unionLoan += short;
-    co.cash = 0;
+  const short = amount - co.cash - co.bank;
+  subtractCash(co, amount);
+  if (short > 0) {
     log(
       state,
       state.companies.indexOf(co),
@@ -110,62 +125,43 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
   const pi = co.planet;
 
   switch (a.type) {
+    /* ---- marketplace ---- */
     case 'buy': {
       const tons = posInt(a.tons, 'tons');
       need(state.commodities.includes(a.commodity), 'unknown commodity');
+      const price = p.price[a.commodity]!;
+      need(co.cash >= price, 'not enough cash for even one ton');
+      need(cargoTons(co) < co.ship.cargo, 'the cargo bay is full');
       const stock = p.stock[a.commodity] ?? 0;
+      need(stock > 0, 'none for sale here');
       need(tons <= stock, 'not that many tons on the planet');
       need(cargoTons(co) + tons <= co.ship.cargo, 'not enough room in the cargo bay');
-      const price = p.price[a.commodity]!;
-      const cost = tons * price;
-      need(cost <= co.cash, 'not enough cash');
-      co.cash -= cost;
+      need(tons * price <= co.cash + co.bank, 'not enough money');
       addLot(co.cargo, a.commodity, tons, price);
-      addLot(co.visitBought, a.commodity, tons, price);
+      subtractCash(co, tons * price);
       p.stock[a.commodity] = stock - tons;
-      nudgeSupply(p, a.commodity, tons);
-      p.price[a.commodity] = priceForSupply(
-        a.commodity,
-        p.supply[a.commodity]!,
-        LEVEL_BY_ID(state.settings.level).squeeze,
-      );
       return;
     }
     case 'sell': {
       const tons = posInt(a.tons, 'tons');
       const lot = co.cargo[a.commodity];
       need(lot && lot.tons >= tons, 'you do not have that many tons');
-      // full refund for tons bought during this visit
-      const vb = co.visitBought[a.commodity];
-      const refundTons = Math.min(tons, vb?.tons ?? 0);
-      const marketTons = tons - refundTons;
-      let revenue = 0;
-      if (refundTons > 0) {
-        revenue += refundTons * vb!.paid;
-        vb!.tons -= refundTons;
-        if (vb!.tons === 0) delete co.visitBought[a.commodity];
-        nudgeSupply(p, a.commodity, -refundTons);
-      }
-      if (marketTons > 0) {
-        revenue += marketTons * p.price[a.commodity]!;
-        nudgeSupply(p, a.commodity, -marketTons);
-        co.visitProfit += marketTons * (p.price[a.commodity]! - lot!.paid);
-      }
-      co.cash += revenue;
+      const price = p.price[a.commodity]!;
+      // The market price is fixed for the whole week, so selling back what you just bought is
+      // a full refund — no separate bookkeeping needed.
+      state.sellingProfit += Math.floor((price - lot!.paid) * tons);
+      co.visitProfit += Math.floor((price - lot!.paid) * tons);
+      co.cash += Math.floor(price * tons);
       p.stock[a.commodity] = (p.stock[a.commodity] ?? 0) + tons;
-      p.price[a.commodity] = priceForSupply(
-        a.commodity,
-        p.supply[a.commodity]!,
-        LEVEL_BY_ID(state.settings.level).squeeze,
-      );
       removeLot(co.cargo, a.commodity, tons);
       return;
     }
+    /* ---- warehouse ---- */
     case 'store': {
       const tons = posInt(a.tons, 'tons');
       const lot = co.cargo[a.commodity];
       need(lot && lot.tons >= tons, 'you do not have that many tons on the ship');
-      need(warehouseTons(co, pi) + tons <= (co.warehouseCap[pi] ?? 0), 'warehouse is full');
+      need(warehouseTons(co, pi) + tons <= co.warehouseSpace, 'the warehouse is full');
       co.warehouse[pi] ??= {};
       addLot(co.warehouse[pi]!, a.commodity, tons, lot!.paid);
       removeLot(co.cargo, a.commodity, tons);
@@ -180,13 +176,23 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
       removeLot(co.warehouse[pi]!, a.commodity, tons);
       return;
     }
+    /* ---- passengers ---- */
     case 'setTicketPrice':
       need(Number.isFinite(a.price), 'bad price');
-      co.ticketPrice = Math.round(Math.min(ECON.ticketMax, Math.max(ECON.ticketMin, a.price)));
+      need(a.price >= ECON.ticketMin, `the minimum fare is ${ECON.ticketMin} kubars`);
+      co.ticketPrice = Math.floor(a.price);
       return;
-    case 'pickupPassengers':
-      co.passengers = passengersWaiting(co);
+    case 'pickupPassengers': {
+      need(!co.paxPickedUp, 'you have already taken on passengers here');
+      need(co.paxWaiting > 0, 'nobody is waiting for a ticket');
+      co.paxPickedUp = true;
+      co.passengers = co.paxWaiting;
+      const income = co.paxPrice * co.passengers;
+      co.cash += income;
+      co.taxOwedPassenger += Math.floor((income * state.econ.passTax) / 100);
       return;
+    }
+    /* ---- advertising ---- */
     case 'advertise': {
       const tp = Math.floor(a.passenger);
       const tc = Math.floor(a.commodity);
@@ -194,23 +200,27 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
         tp >= 0 && tp < ECON.adTiers.length && tc >= 0 && tc < ECON.adTiers.length,
         'bad ad tier',
       );
-      const cost =
-        adSpend(tp, co) +
-        adSpend(tc, co) -
-        adSpend(co.adPassenger, co) -
-        adSpend(co.adCommodity, co);
-      need(cost <= co.cash, 'not enough cash');
-      co.cash -= cost;
+      const fixP = adCost(tp, co);
+      const fixC = adCost(tc, co);
+      need(
+        co.cash + co.advertInvestedP + co.advertInvestedC >= fixP + fixC,
+        'not enough cash for that campaign',
+      );
+      co.cash += co.advertInvestedP + co.advertInvestedC; // refund this week's earlier placement
       co.adPassenger = tp;
       co.adCommodity = tc;
+      co.advertInvestedP = fixP;
+      co.advertInvestedC = fixC;
+      co.advertP = Math.floor(co.advertInvestedP / 125);
+      co.cash -= fixP + fixC;
       return;
     }
+    /* ---- crew & taxes ---- */
     case 'payCrew':
       need(co.wagesOwed > 0, 'nothing owed');
       need(co.wagesOwed <= co.cash, 'not enough cash');
       co.cash -= co.wagesOwed;
       co.wagesOwed = 0;
-      co.onStrike = false;
       return;
     case 'payTaxes': {
       const due = co.taxOwedPassenger + co.taxOwedTariff;
@@ -219,15 +229,16 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
       co.cash -= due;
       co.taxOwedPassenger = 0;
       co.taxOwedTariff = 0;
-      co.weeksTaxUnpaid = 0;
       return;
     }
+    /* ---- insurance ---- */
     case 'buyInsurance':
       need(!co.insured, 'already insured for this trip');
-      need(co.insurancePremium <= co.cash, 'not enough cash');
-      co.cash -= co.insurancePremium;
+      need(co.insuranceCost <= co.cash, 'not enough cash');
+      co.cash -= co.insuranceCost;
       co.insured = true;
       return;
+    /* ---- bank & loans ---- */
     case 'bankDeposit': {
       const amt = posInt(a.amount, 'amount');
       need(amt <= co.cash, 'not enough cash');
@@ -263,37 +274,42 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
       co.zinnLoan -= amt;
       return;
     }
+    /* ---- fuel ---- */
     case 'buyFuel': {
-      const tons = Math.min(posInt(a.tons, 'tons'), co.ship.fuelCap - co.ship.fuel);
-      need(tons > 0, 'tank is full');
-      const cost = Math.round(tons * p.fuelPrice * (1 - co.mods.fuelDiscount));
+      const tons = posInt(a.tons, 'tons');
+      const room = co.ship.fuelCap - co.ship.fuel;
+      need(room > 0, 'the tank is full');
+      need(tons <= room, 'that is more than the tank holds');
+      const cost = Math.floor(tons * p.fuelPrice);
       need(cost <= co.cash, 'not enough cash');
       co.cash -= cost;
-      co.ship.fuel += tons;
-      co.mods.fuelDiscount = 0;
+      co.ship.fuel = Math.floor(co.ship.fuel + tons);
       return;
     }
+    /* ---- stock exchange ---- */
     case 'stockBuy': {
       const n = posInt(a.shares, 'shares');
-      need(p.exchange.closedFor === 0, 'the exchange is closed');
-      need(!co.stockBoughtThisWeek, 'only one purchase per week allowed');
-      const cost = n * p.exchange.price;
-      const total = Math.round(cost * (1 + ECON.brokerFee));
-      need(
-        total <= co.cash * ECON.stockWeeklyCashCap + 0.5,
-        'you may invest at most 50% of your cash per week',
-      );
-      co.cash -= total;
-      addLot(co.shares as Record<number, { tons: number; paid: number }>, pi, n, p.exchange.price);
+      need(!p.exchange.crashed, 'the exchange has crashed');
+      need(!co.stockBoughtThisWeek, 'only one purchase per turn is allowed');
+      const price = p.exchange.price;
+      need(price > 0, 'no shares are trading');
+      const maxShares = Math.floor((0.5 * (co.cash + co.bank)) / price);
+      need(maxShares >= 1, 'you cannot afford a single share');
+      need(n <= maxShares, 'you may invest at most half of your money each week');
       co.stockBoughtThisWeek = true;
+      subtractCash(co, price * n);
+      addLot(co.shares as Record<number, { tons: number; paid: number }>, pi, n, price);
+      subtractCash(co, Math.floor((ECON.brokerFee * price * n) / 100));
       return;
     }
     case 'stockSell': {
       const n = posInt(a.shares, 'shares');
+      need(!p.exchange.crashed, 'the exchange has crashed');
       const lot = co.shares[pi];
       need(lot && lot.tons >= n, 'you do not own that many shares');
-      need(p.exchange.closedFor === 0, 'the exchange is closed');
-      co.cash += Math.round(n * p.exchange.price * (1 - ECON.brokerFee));
+      const price = p.exchange.price;
+      co.cash += Math.floor(n * price);
+      subtractCash(co, Math.floor((ECON.brokerFee * n * price) / 100));
       lot!.tons -= n;
       if (lot!.tons === 0) delete co.shares[pi];
       return;
@@ -303,7 +319,7 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
     case 'journey':
       need(Number.isInteger(a.to) && a.to >= 0 && a.to < state.planets.length, 'bad destination');
       need(a.to !== co.planet, 'you are already there');
-      return doJourney(state, co, a.to, r);
+      return startJourney(state, co, a.to, r);
     default:
       throw new ActionError(`unknown action ${(a as Action).type}`);
   }
@@ -321,7 +337,7 @@ function addLot<K extends PropertyKey>(
   if (!lot) {
     map[k] = { tons, paid: price };
   } else {
-    lot.paid = Math.round(((lot.tons * lot.paid + tons * price) / (lot.tons + tons)) * 100) / 100;
+    lot.paid = Math.floor((lot.tons * lot.paid + tons * price) / (lot.tons + tons));
     lot.tons += tons;
   }
 }
@@ -338,131 +354,195 @@ function removeLot<K extends PropertyKey>(
 
 /* -------------------------------------------------------------- journey */
 
-function doJourney(state: GameState, co: CompanyState, to: number, r: Rng): void {
+/**
+ * Picking a destination: first the credit gate — over either limit you must either
+ * turn back or declare bankruptcy — then the week's sealed auction bid, then the flight.
+ */
+function startJourney(state: GameState, co: CompanyState, to: number, r: Rng): void {
+  if (co.zinnLoan > co.zinnLimit) {
+    state.pending = {
+      id: 'gate:zinn',
+      title: 'Mr. Zinn Is Waiting',
+      text: `You owe Mr. Zinn ${fmt(co.zinnLoan)} kubars — past your ${fmt(co.zinnLimit)} limit. He will not let your ship leave until you are back inside it. Return to the main menu and put your house in order, or declare bankruptcy?`,
+      choices: [
+        { id: 'yes', label: 'Back to the menu' },
+        { id: 'no', label: 'Declare bankruptcy' },
+      ],
+      portrait: 'zinn',
+      mood: 'bad',
+      context: 'planet',
+      data: { to },
+    };
+    return;
+  }
+  if (co.unionLoan > co.unionLimit) {
+    state.pending = {
+      id: 'gate:union',
+      title: "The Trader's Union Objects",
+      text: `Your Union loan stands at ${fmt(co.unionLoan)} kubars, past your ${fmt(co.unionLimit)} credit limit. Return to the main menu and settle it, or declare bankruptcy?`,
+      choices: [
+        { id: 'yes', label: 'Back to the menu' },
+        { id: 'no', label: 'Declare bankruptcy' },
+      ],
+      portrait: 'union',
+      mood: 'bad',
+      context: 'planet',
+      data: { to },
+    };
+    return;
+  }
+  const a = state.auction;
+  const ci = currentIndex(state);
+  if (a && !a.responded.includes(ci)) {
+    const presets = a.kind === 'ship' ? [10000, 25000, 50000] : [5 * a.fee, 15 * a.fee, 30 * a.fee];
+    state.pending = {
+      id: 'auction:bid',
+      title: a.kind === 'ship' ? 'Ship Auction' : 'Facility Auction',
+      text:
+        a.kind === 'ship'
+          ? `Before you set course: the Traders' Union is auctioning a 200-ton enlargement of your ship to the highest secret bid. Suggested bids: ${presets.map(fmt).join(', ')}. Other players: eyes closed!`
+          : `Before you set course: Emperor Dred is privatising a government facility. Its owner charges every rival ${fmt(a.fee)} kubars each time they land there. Suggested bids: ${presets.map(fmt).join(', ')}. Other players: eyes closed!`,
+      choices: [
+        { id: 'bid', label: 'Place bid' },
+        { id: 'no', label: 'No bid' },
+      ],
+      input: { label: 'Your secret bid (kubars)', min: 0, max: 1e11, initial: 0 },
+      portrait: 'dred',
+      mood: 'neutral',
+      context: 'planet',
+      data: { to },
+    };
+    return;
+  }
+  depart(state, co, to, r);
+}
+
+/**
+ * Departure pipeline part one: bookkeeping, interest, wages, then the
+ * in-flight event chain — which may pause for a dialog and resume in `finishDeparture`.
+ */
+function depart(state: GameState, co: CompanyState, to: number, r: Rng): void {
   const ci = currentIndex(state);
   const from = co.planet;
-  const dist = distanceBetween(state, from, to);
   state.destination = to;
   state.arrivalReports = [];
   state.phase = 'travel';
+  state.travel = {
+    from,
+    to,
+    good: true,
+    cursor: 0,
+    fired: false,
+    delays: 0,
+    badExclusiveDone: false,
+    block4447: false,
+    badChainForced: false,
+  };
 
-  // --- leaving: export tariff, weekly accruals ---
-  const exportTax = Math.round(cargoValue(co) * state.econ.exportTariff);
-  if (exportTax > 0) co.taxOwedTariff += exportTax;
-  co.bank = Math.round(co.bank * (1 + co.bankRate));
-  co.unionLoan = Math.round(co.unionLoan * (1 + co.unionRate));
-  co.zinnLoan = Math.round(co.zinnLoan * (1 + co.zinnRate));
-  co.wagesOwed += co.ship.crew * co.crewSalary;
-  if (co.taxOwedPassenger + co.taxOwedTariff > 0) co.weeksTaxUnpaid++;
-  else co.weeksTaxUnpaid = 0;
-  co.visitProfit = 0;
-  co.visitBought = {};
-  co.mods.fuelDiscount = 0;
-  if (co.mods.blessedWeeks > 0 && --co.mods.blessedWeeks === 0) co.luck = 0.5;
+  // state 1 — departure bookkeeping
+  co.random = r.fint(1, 100);
+  const destPlanet = state.planets[to]!;
+  destPlanet.advertC += Math.floor(co.advertInvestedC / 50);
+  if (co.ship.cargo > 100) destPlanet.advertC += co.ship.cargo - 100;
+  state.sellingProfit = 0;
+  co.specialUsed = false;
+  co.loanInterest = Math.floor((co.unionLoan * co.loanRate) / 100);
+  co.unionLoan += co.loanInterest;
+  co.savingsInterest = Math.floor((co.bank * co.savingsRate) / 100);
+  co.bank += co.savingsInterest;
+  co.zinnInterest = Math.floor((co.zinnLoan * co.zinnRate) / 100);
+  co.zinnLoan += co.zinnInterest;
+  co.wagesOwed += co.crewSalary * co.ship.crew;
 
-  // --- fuel ---
-  const used = fuelUsage(dist, shipTons(co), r);
-  if (used > co.ship.fuel) {
-    const short = used - co.ship.fuel;
-    const emergency = 20000 + short * r.int(6000, 9000);
-    co.ship.fuel = 0;
-    forcePay(state, co, emergency, 'emergency fuel');
-    report(
-      state,
-      'bad',
-      `You ran out of Ionic Fuel ${short} tons short of ${PLANET_BY_ID[state.planets[to]!.id].name}. An emergency tanker charged you ${fmt(emergency)} kubars.`,
-    );
-  } else {
-    co.ship.fuel -= used;
-  }
-  co.lastTravelTime = travelTime(state, from, to, co.ship.kuarps);
-
-  // --- strike check ---
-  if (co.wagesOwed > co.ship.crew * co.crewSalary * 1.5 && !co.onStrike && r.chance(0.35)) {
-    co.onStrike = true;
-    report(
-      state,
-      'bad',
-      'Your crew has gone on strike! Pay all wages owed before you can pick up passengers again.',
-    );
-  }
-
-  // --- travel events (may leave a pending choice) ---
-  rollTravelEvents(state, co, ci, from, to, r);
-  if ((state.phase as Phase) === 'event') return; // wait for eventChoice, then arrive()
-  arrive(state, r);
+  if (state.week > 3 && beginEventRoll(state, co, ci, r)) return; // wait for the dialog
+  finishDeparture(state, co, r);
 }
 
-export function arrive(state: GameState, r: Rng): void {
+/**
+ * Departure pipeline part two: the streak rule, fuel, crew strike,
+ * running dry, the tax audit, export tariff, next trip's premium and passengers.
+ */
+function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
   const ci = currentIndex(state);
-  const co = state.companies[ci]!;
+  const tc = state.travel!;
+  const from = tc.from;
   const to = state.destination!;
-  const p = state.planets[to]!;
-  const pname = PLANET_BY_ID[p.id].name;
-  co.planet = to;
-  state.destination = null;
-  if (co.inbox.length) {
-    state.arrivalReports.push(...co.inbox);
-    co.inbox = [];
+  const dist = distanceBetween(state, from, to);
+
+  // state 3 — luck bookkeeping, fuel burn, crew strike
+  endChainStreak(state, co);
+  applyEventGoodFloor(state, co);
+
+  co.ship.fuel -= fuelUsage(dist, co.ship.tons, r);
+
+  if (co.wagesOwed >= co.ship.crew * co.crewSalary * 5 && r.fint(1, 3) === 1) {
+    const owed = co.wagesOwed;
+    forcePay(state, co, owed, 'the crew strike settlement');
+    co.wagesOwed = 0;
+    co.crewSalary += 500;
+    badChainStreak(co);
+    report(
+      state,
+      'bad',
+      `Your crew downed tools mid-flight. You paid all ${fmt(owed)} kubars owed on the spot, and their salary is now ${fmt(co.crewSalary)} each.`,
+    );
   }
 
-  // passengers pay on arrival (taxed)
-  if (co.passengers > 0) {
-    const income = co.passengers * co.ticketPrice;
-    const tax = Math.round(income * state.econ.passengerTax);
-    co.cash += income;
-    co.taxOwedPassenger += tax;
+  // states 4/5 — out of fuel
+  if (co.ship.fuel < 0) {
+    const cost = co.ship.fuelCap * state.econ.fuelPriceRange * 10 + 10000;
+    forcePay(state, co, cost, 'the emergency tanker');
+    co.ship.fuel = co.ship.fuelCap;
+    co.travelDelayed += 1;
+    badChainStreak(co);
     report(
       state,
-      'good',
-      `${co.passengers} passengers paid ${fmt(income)} kubars for the trip to ${pname} (passenger tax ${fmt(tax)} due).`,
+      'bad',
+      `You ran dry between planets. An emergency tanker filled your tank and charged ${fmt(cost)} kubars for the privilege. You are running late.`,
     );
-    co.passengers = 0;
   }
-  // import tariff
-  const importTax = Math.round(cargoValue(co) * state.econ.importTariff);
-  if (importTax > 0) {
-    co.taxOwedTariff += importTax;
-    report(state, 'info', `Import tariff of ${fmt(importTax)} kubars assessed on your cargo.`);
-  }
-  // facilities: pay fees to owners, collect own revenue
-  for (const f of p.facilities) {
-    if (f.owner === ci) {
-      if (f.revenue > 0) {
-        co.cash += f.revenue;
-        report(state, 'good', `${f.name} earned you ${fmt(f.revenue)} kubars in fees.`);
-        f.revenue = 0;
-      }
-    } else if (f.owner >= 0) {
-      forcePay(state, co, f.fee, `${f.name} fee`);
-      f.revenue += f.fee;
-      report(
-        state,
-        'bad',
-        `${state.companies[f.owner]!.name} charged you ${fmt(f.fee)} kubars to use the ${f.name}.`,
-      );
-    }
-  }
-  // commodity ads add tons at the destination
-  const adC = adSpend(co.adCommodity, co);
-  if (adC > 0) {
-    const extra = Math.floor(adC / 50);
-    const per = Math.max(1, Math.floor(extra / state.commodities.length));
-    for (const c of state.commodities) p.stock[c] = (p.stock[c] ?? 0) + per;
+
+  // state 6 — tax audit
+  const owed = co.taxOwedPassenger + co.taxOwedTariff;
+  if (owed >= 35 * co.ship.tons && r.fint(1, 3) === 1) {
+    const bill = 3 * owed;
+    forcePay(state, co, bill, 'the tax audit');
+    co.taxOwedPassenger = 0;
+    co.taxOwedTariff = 0;
+    badChainStreak(co);
     report(
       state,
-      'info',
-      `Your commodity advertising brought ${extra} extra tons of goods to the market on ${pname}.`,
+      'bad',
+      `The Imperial Tax Auditor boarded you in transit: ${fmt(owed)} kubars of arrears plus twice that in fines — ${fmt(bill)} kubars in all.`,
     );
   }
-  // roll next week's passengers, ads reset, insurance consumed
-  rollPassengerDemand(co, adSpend(co.adPassenger, co), r);
-  co.adPassenger = 0;
-  co.adCommodity = 0;
+
+  // state 7 — exit
+  const exportTax = Math.floor(
+    (cargoMarketValue(co, state.planets[from]!) * state.econ.exportTariff) / 100,
+  );
+  if (exportTax > 0) co.taxOwedTariff += exportTax;
+  co.insuranceCost = rollInsuranceCost(co, r);
+  computePassengers(co, r);
   co.insured = false;
-  co.insurancePremium = insurancePremium(state, co, r);
-  co.stockBoughtThisWeek = false;
-  if (co.onStrike) co.paxBase = 0;
+  co.advertInvestedP = 0;
+  co.advertInvestedC = 0;
+  co.advertP = 0;
+  co.passengers = 0;
+  co.visitProfit = 0;
+
+  co.lastTravelTime = humanTravelTime(dist, co.ship.kuarps, co.travelDelayed);
+  co.travelDelayed = 1;
+  co.planetLast = from;
+  co.planet = to;
+  co.arrivalPending = true;
+  state.destination = null;
+  state.travel = null;
+
+  const pname = PLANET_BY_ID[state.planets[to]!.id].name;
+  report(state, 'info', `Course set for ${pname}.`);
+  log(state, ci, 'info', `${co.name} left ${PLANET_BY_ID[state.planets[from]!.id].name}.`);
+  state.awaitingHandoff = true;
   state.phase = 'arrival';
 }
 
@@ -473,28 +553,45 @@ function doEventChoice(state: GameState, choice: string, amount: number | undefi
   const ev = state.pending!;
   const valid = ev.choices.length === 0 ? choice === 'ok' : ev.choices.some((c) => c.id === choice);
   need(valid, 'invalid choice');
+  const data = ev.data ?? {};
   state.pending = null;
   const co = currentCompany(state);
+  const ci = currentIndex(state);
+
+  // the credit gate and the auction bid both sit in front of a journey
+  if (ev.id === 'gate:zinn' || ev.id === 'gate:union') {
+    if (choice === 'yes') return; // back to the main menu
+    return declareBankrupt(state, co, ci);
+  }
+  if (ev.id === 'auction:bid') {
+    if (choice === 'bid') recordBid(state, ci, amount ?? 0);
+    else state.auction?.responded.push(ci);
+    return startJourney(state, co, data.to as number, r);
+  }
   if (ev.context === 'planet') {
-    if (ev.id === 'auctionbid') recordBid(state, currentIndex(state), choice, amount);
-    else resolveSpecialChoice(state, co, currentIndex(state), ev.id, choice, ev.data ?? {}, r);
-    if (!state.pending) promptBid(state, currentIndex(state));
-    return; // stay on the planet
+    resolveSpecialChoice(state, co, ci, ev.id, choice, data, r, amount);
+    return;
   }
   need(state.phase === 'event', 'no travel event pending');
   state.phase = 'travel';
-  resolveEventChoice(state, co, ev.id, choice, ev.data ?? {}, r);
-  if ((state.phase as Phase) === 'event') return; // chained event
-  arrive(state, r);
+  if (resolveTravelEvent(state, co, ci, ev.id, choice, data, r)) return; // another event fired
+  finishDeparture(state, co, r);
 }
 
-/* ------------------------------------------------------ continue / week */
+/* ------------------------------------------------------ turns and weeks */
 
 function doContinue(state: GameState, r: Rng): void {
   need(state.phase === 'arrival', 'nothing to continue from');
   state.arrivalReports = [];
+  if (state.awaitingHandoff) {
+    state.awaitingHandoff = false;
+    return advanceTurn(state, r);
+  }
+  state.phase = 'onPlanet'; // the reports were this company's arrival; its turn begins now
+}
+
+function advanceTurn(state: GameState, r: Rng): void {
   state.turnIndex++;
-  // skip bankrupt companies
   while (
     state.turnIndex < state.order.length &&
     state.companies[state.order[state.turnIndex]!]!.bankrupt
@@ -502,127 +599,211 @@ function doContinue(state: GameState, r: Rng): void {
     state.turnIndex++;
   }
   if (state.turnIndex >= state.order.length) endWeek(state, r);
-  else {
-    state.phase = 'onPlanet';
-    enterTurn(state);
-  }
+  else enterTurn(state);
 }
 
-/** A company's turn begins: pending auction bid prompt for humans. */
+/**
+ * A human's turn begins: crashed exchanges wipe holdings, last week's auction
+ * is announced, and — if they flew in — the arrival charges land before the main menu opens.
+ */
 function enterTurn(state: GameState): void {
   const ci = currentIndex(state);
   const co = state.companies[ci];
-  if (co && !co.isAI) promptBid(state, ci);
+  if (!co) return;
+  state.arrivalReports = [];
+  co.stockBoughtThisWeek = false;
+
+  // crashed exchanges wipe every holding (the first human to look also wipes the rivals')
+  const firstHuman =
+    state.order.findIndex((i) => !state.companies[i]!.bankrupt) === state.turnIndex;
+  state.planets.forEach((p, i) => {
+    if (!p.exchange.crashed) return;
+    if (co.shares[i]) {
+      delete co.shares[i];
+      report(
+        state,
+        'bad',
+        `${PLANET_BY_ID[p.id].exchange} has crashed. Your shares in it are worthless.`,
+      );
+    }
+    if (firstHuman) {
+      for (const other of state.companies) if (other.isAI) delete other.shares[i];
+    }
+  });
+
+  if (co.sabotageDamage !== 0) {
+    const amount = Math.abs(co.sabotageDamage);
+    const loaned = co.sabotageDamage < 0;
+    report(
+      state,
+      'bad',
+      `Sabotage! Someone arranged a series of accidents for your company: ${fmt(amount)} kubars of damage.${loaned ? " The Trader's Union covered what you could not." : ''}`,
+    );
+    co.sabotageDamage = 0;
+  }
+
+  const auctionNews = auctionReportFor(state, ci);
+  if (auctionNews) report(state, 'info', auctionNews);
+
+  if (co.arrivalPending) {
+    co.arrivalPending = false;
+    arriveOnPlanet(state, co, ci);
+  }
+  if (co.inbox.length) {
+    state.arrivalReports.push(...co.inbox);
+    co.inbox = [];
+  }
+  state.awaitingHandoff = false;
+  state.phase = state.arrivalReports.length ? 'arrival' : 'onPlanet';
 }
 
+/** Arrival charges: import tariff, then facility fees paid and collected. */
+function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
+  const p = state.planets[co.planet]!;
+  const pname = PLANET_BY_ID[p.id].name;
+  report(state, 'info', `You touch down on ${pname}.`);
+
+  // import tariff — only assessed if you already owe something (a quirk of the original)
+  if (co.taxOwedPassenger + co.taxOwedTariff !== 0) {
+    const tax = Math.floor((cargoMarketValue(co, p) * state.econ.importTariff) / 100);
+    if (tax > 0) {
+      co.taxOwedTariff += tax;
+      report(state, 'info', `Import tariff of ${fmt(tax)} kubars assessed on your cargo.`);
+    }
+  }
+  for (const f of p.facilities) {
+    if (f.owner === ci) {
+      if (f.revenue > 0) {
+        co.cash += f.revenue;
+        report(
+          state,
+          'good',
+          `Your ${f.name} here has collected ${fmt(f.revenue)} kubars in landing fees.`,
+        );
+        f.revenue = 0;
+      }
+    } else if (f.owner >= 0) {
+      forcePay(state, co, f.fee, `the ${f.name} landing fee`);
+      f.revenue += f.fee;
+      report(
+        state,
+        'bad',
+        `${state.companies[f.owner]!.name} charged you ${fmt(f.fee)} kubars to land at the ${f.name}.`,
+      );
+    }
+  }
+}
+
+/** Bankruptcy is only ever declared by the player at the credit gate. */
+function declareBankrupt(state: GameState, co: CompanyState, ci: number): void {
+  co.bankrupt = true;
+  for (const p of state.planets) {
+    for (const f of p.facilities) {
+      if (f.owner === ci) {
+        f.owner = -1;
+        f.revenue = 0;
+      }
+    }
+  }
+  log(state, -1, 'news', `${co.name} has declared bankruptcy and left the trade routes.`);
+  const humansLeft = state.companies.filter((c) => !c.isAI && !c.bankrupt);
+  if (humansLeft.length === 0) {
+    state.phase = 'gameOver';
+    state.winner = null;
+    return;
+  }
+  co.arrivalPending = false;
+  state.awaitingHandoff = true;
+  state.phase = 'arrival';
+  state.arrivalReports = [
+    log(state, ci, 'bad', "Your company is bankrupt. The Trader's Union has seized your ship."),
+  ];
+}
+
+/* ------------------------------------------------------------ week rollover */
+
+/** The week rolls over once every human has moved. */
 function endWeek(state: GameState, r: Rng): void {
   state.week++;
 
-  // --- world: supply drift, restock, prices, fuel, exchanges ---
-  for (const p of state.planets) {
-    for (const c of state.commodities) {
-      const s = p.supply[c] ?? 50;
-      const drift = (50 - s) * 0.08 + (r.float() - 0.5) * 16;
-      p.supply[c] = Math.min(100, Math.max(0, s + drift));
-      const target = stockForSupply(c, p.supply[c]!, r);
-      const cur = p.stock[c] ?? 0;
-      p.stock[c] = Math.max(0, Math.round(cur + (target - cur) * 0.6));
-    }
-    refreshPlanetPrices(state, p, r);
-    p.fuelPrice = Math.round(
-      Math.min(
-        ECON.fuelPriceMax,
-        Math.max(ECON.fuelPriceMin, p.fuelPrice * (0.85 + 0.3 * r.float())),
-      ),
-    );
-    stepExchange(p, r);
-  }
+  runOpponents(state, r); // the six rivals act in one batch first
+  stepStockMarket(state, r); // (1)
+  rollNewsEvent(state, r); // (2)
+  rollWeather(state, r); // (3)
+  moveOpponents(state, r); // (4) rivals pick a destination; human order rebuilt below
+  if (state.week > 2) runAuctionWeek(state, r); // (5)
+  economicChange(state, r); // (6)
+  commodityAvailable(state, r); // (7)
+  commodityPrice(state); // (8)
+  rollFuelPrices(state, r); // (9)
+  if (state.week > 4) gameEvents(state, r); // (10)
+  if (state.week > 4) opponentEvents(state, r); // (11)
 
-  // --- weekly economic roll, auctions ---
-  weeklyEconomy(state, r);
-  settleAuction(state);
-  maybeStartAuction(state, r);
-
-  // --- companies: bankruptcy, net worth, win ---
-  for (let i = 0; i < state.companies.length; i++) {
-    const co = state.companies[i]!;
-    if (co.bankrupt) continue;
-    if (co.unionLoan > co.unionLimit) {
-      co.bankrupt = true;
-      log(
-        state,
-        -1,
-        'news',
-        `${co.name} exceeded its Trader's Union credit limit and has been declared BANKRUPT.`,
-      );
-    } else if (co.zinnLoan > co.zinnLimit) {
-      co.bankrupt = true;
-      log(state, -1, 'news', `Mr. Zinn repossessed ${co.name}'s ship. ${co.name} is BANKRUPT.`);
-    }
-    // tax audit after 3 weeks of arrears
-    const owed = co.taxOwedPassenger + co.taxOwedTariff;
-    if (owed > 0 && co.weeksTaxUnpaid >= 3) {
-      const fine = Math.round(owed * 0.25);
-      forcePay(state, co, owed + fine, 'the tax audit');
-      co.taxOwedPassenger = 0;
-      co.taxOwedTariff = 0;
-      co.weeksTaxUnpaid = 0;
-      co.inbox.push({
-        week: state.week,
-        company: i,
-        kind: 'bad',
-        text: `The Imperial Tax Auditor caught up with you: ${fmt(owed)} kubars in overdue taxes collected, plus a ${fmt(fine)} kubar fine.`,
-      });
-    }
+  for (const co of state.companies) {
+    // (12) + (13): net worth is only recomputed here, and history is a 21-week ring
     co.netWorthHistory.push(netWorth(state, co));
-    if (co.netWorthHistory.length > 60) co.netWorthHistory.shift();
+    if (co.netWorthHistory.length > 21) co.netWorthHistory.shift();
   }
-  const alive = state.companies.map((c, i) => [c, i] as const).filter(([c]) => !c.bankrupt);
-  const rich = alive.filter(([c]) => netWorth(state, c) >= state.settings.targetNetWorth);
-  if (rich.length > 0) {
-    rich.sort((a, b) => netWorth(state, b[0]) - netWorth(state, a[0]));
-    state.winner = rich[0]![1];
-    // An AI-only simulation has no human available to answer the continuation decision.
-    state.phase = state.companies.some((co) => !co.isAI) ? 'winner' : 'gameOver';
-    log(
-      state,
-      -1,
-      'news',
-      `${rich[0]![0].name} reached ${fmt(state.settings.targetNetWorth)} kubars and leads the competition.`,
-    );
-    return;
-  }
-  const humansAlive = alive.filter(([c]) => !c.isAI);
-  const anyHuman = state.companies.some((c) => !c.isAI);
-  if ((anyHuman && humansAlive.length === 0) || alive.length <= 1) {
-    state.winner = alive.length === 1 ? alive[0]![1] : null;
+
+  if (checkWinner(state)) return; // (14)
+
+  state.order = nextTurnOrder(state);
+  state.turnIndex = 0;
+  if (state.order.length === 0) {
     state.phase = 'gameOver';
     return;
   }
-
-  state.order = nextTurnOrder(state, alive);
-  state.turnIndex = 0;
-  state.phase = 'onPlanet';
   enterTurn(state);
 }
 
-function nextTurnOrder(
-  state: GameState,
-  alive: readonly (readonly [CompanyState, number])[],
-): number[] {
-  const prev = new Map(state.order.map((c, i) => [c, i]));
-  const byArrival = (a: number, b: number) => {
-      const d = state.companies[a]!.lastTravelTime - state.companies[b]!.lastTravelTime;
-      return d !== 0 ? d : (prev.get(a) ?? 0) - (prev.get(b) ?? 0);
-    };
-  const indices = alive.map(([, i]) => i);
-  if (state.settings.ruleset === 'steam') return indices.sort(byArrival);
+/** Humans race each other by travel time; rivals run inside the rollover. */
+function nextTurnOrder(state: GameState): number[] {
+  const humans = state.companies
+    .map((c, i) => [c, i] as const)
+    .filter(([c]) => !c.isAI && !c.bankrupt)
+    .map(([, i]) => i);
+  return humans.sort(
+    (a, b) => state.companies[a]!.lastTravelTime - state.companies[b]!.lastTravelTime,
+  );
+}
 
-  // Deluxe resolves its human arrivals by travel time, then runs its six rivals in fixed order.
-  return [
-    ...indices.filter((i) => !state.companies[i]!.isAI).sort(byArrival),
-    ...indices.filter((i) => state.companies[i]!.isAI).sort((a, b) => a - b),
-  ];
+/**
+ * Win check: strictly above the current goal, humans winning ties against rivals.
+ * A winner may raise the stakes and keep playing.
+ */
+function checkWinner(state: GameState): boolean {
+  const goal = state.settings.targetNetWorth;
+  const rivals = state.companies
+    .map((c, i) => [c, i] as const)
+    .filter(([c]) => c.isAI)
+    .sort((a, b) => netWorth(state, b[0]) - netWorth(state, a[0]));
+  const humans = state.companies
+    .map((c, i) => [c, i] as const)
+    .filter(([c]) => !c.isAI && !c.bankrupt)
+    .sort((a, b) => netWorth(state, b[0]) - netWorth(state, a[0]));
+
+  const bestHuman = humans[0];
+  const bestRival = rivals[0];
+  let winner: number | null = null;
+  if (
+    bestHuman &&
+    netWorth(state, bestHuman[0]) >= (bestRival ? netWorth(state, bestRival[0]) : -Infinity) &&
+    netWorth(state, bestHuman[0]) > goal
+  ) {
+    winner = bestHuman[1];
+  } else if (bestRival && netWorth(state, bestRival[0]) > goal) {
+    winner = bestRival[1];
+  }
+  if (winner === null) return false;
+  state.winner = winner;
+  state.phase = humans.length ? 'winner' : 'gameOver';
+  log(
+    state,
+    -1,
+    'news',
+    `${state.companies[winner]!.name} has passed ${fmt(goal)} kubars and won the competition.`,
+  );
+  return true;
 }
 
 function resolveWinningChoice(
@@ -630,7 +811,7 @@ function resolveWinningChoice(
   action: 'continueCompetition' | 'retireCompetition',
 ): void {
   need(state.phase === 'winner', 'there is no winning decision to make');
-  if (action === 'retireCompetition' || state.settings.ruleset === 'steam') {
+  if (action === 'retireCompetition') {
     state.phase = 'gameOver';
     return;
   }
@@ -639,117 +820,41 @@ function resolveWinningChoice(
     state.settings.targetNetWorth,
   );
   state.winner = null;
-  state.phase = 'onPlanet';
+  state.order = nextTurnOrder(state);
+  state.turnIndex = 0;
+  if (state.order.length === 0) {
+    state.phase = 'gameOver';
+    return;
+  }
   enterTurn(state);
 }
 
-function stepExchange(p: { exchange: GameState['planets'][number]['exchange'] }, r: Rng): void {
-  const ex = p.exchange;
-  if (ex.closedFor > 0) {
-    ex.closedFor--;
-    if (ex.closedFor === 0) {
-      ex.price = 1000;
-      ex.trend = 0.5;
-    }
-    ex.history.push(ex.price);
-  } else {
-    const up = r.chance(ex.trend);
-    const pct = r.int(1, 6) / 100;
-    ex.price = Math.round(ex.price * (up ? 1 + pct : 1 - pct));
-    // momentum: trend follows the move, mean-reverts slowly
-    ex.trend = Math.min(
-      0.85,
-      Math.max(0.15, ex.trend + (up ? 0.06 : -0.06) + (0.5 - ex.trend) * 0.05),
-    );
-    if (ex.price < 250 && r.chance(0.5)) ex.price = Math.round(ex.price * 0.5);
-    if (ex.price < 100) {
-      ex.price = 0;
-      ex.closedFor = 2;
-    }
-    ex.history.push(ex.price);
-  }
-  if (ex.history.length > 40) ex.history.shift();
+/* --------------------------------------------------------------- queries */
+
+/** Tons of `c` the company could buy here right now. */
+export function maxBuyable(state: GameState, co: CompanyState, c: CommodityId): number {
+  const p = state.planets[co.planet]!;
+  const price = p.price[c] ?? 0;
+  if (price <= 0) return 0;
+  const room = co.ship.cargo - cargoTons(co);
+  return Math.max(0, Math.min(p.stock[c] ?? 0, room, Math.floor(co.cash / price)));
 }
 
-function weeklyEconomy(state: GameState, r: Rng): void {
-  const roll = r.int(1, 20);
-  const bump = (k: 'importTariff' | 'exportTariff' | 'passengerTax', d: number, label: string) => {
-    const old = state.econ[k];
-    state.econ[k] = Math.max(0, Math.round((old + d) * 100) / 100);
-    log(
-      state,
-      -1,
-      'news',
-      `Imperial decree: ${label} changed from ${Math.round(old * 100)}% to ${Math.round(state.econ[k] * 100)}%.`,
-    );
-  };
-  switch (roll) {
-    case 1:
-    case 2: {
-      // harvest glut / shortage on an agricultural good
-      const agri = state.commodities.filter((c) => COMMODITY_BY_ID[c].agri);
-      if (agri.length === 0) return;
-      const c = r.pick(agri);
-      const glut = roll === 1;
-      for (const p of state.planets) {
-        p.supply[c] = Math.min(100, Math.max(0, (p.supply[c] ?? 50) + (glut ? 30 : -30)));
-        p.stock[c] = Math.max(0, Math.round((p.stock[c] ?? 0) * (glut ? 1.8 : 0.4)));
-        refreshPlanetPrices(state, p, r);
-      }
-      log(
-        state,
-        -1,
-        'news',
-        glut
-          ? `Bumper harvest: ${COMMODITY_BY_ID[c].name} floods the markets across Kukubia. Prices tumble.`
-          : `Crop failure: ${COMMODITY_BY_ID[c].name} is scarce everywhere. Prices soar.`,
-      );
-      return;
-    }
-    case 3:
-      return bump('exportTariff', 0.01, 'the export tariff');
-    case 4:
-      return bump('exportTariff', -0.01, 'the export tariff');
-    case 5:
-      return bump('importTariff', 0.01, 'the import tariff');
-    case 6:
-      return bump('importTariff', -0.01, 'the import tariff');
-    case 7:
-      return bump('passengerTax', 0.05, 'the passenger tax');
-    case 8:
-      return bump('passengerTax', -0.05, 'the passenger tax');
-    case 9: {
-      for (const p of state.planets)
-        p.fuelPrice = Math.min(ECON.fuelPriceMax, Math.round(p.fuelPrice * 1.5));
-      log(
-        state,
-        -1,
-        'news',
-        'Ionic Fuel shock: refinery strike on Nosh sends fuel prices up across the colonies.',
-      );
-      return;
-    }
-    case 10: {
-      for (const p of state.planets)
-        p.fuelPrice = Math.max(ECON.fuelPriceMin, Math.round(p.fuelPrice * 0.6));
-      log(state, -1, 'news', 'Fuel glut: new Ionic Fuel wells come online. Fuel prices drop.');
-      return;
-    }
-    case 11:
-    case 12: {
-      // rumour sets a trend on one exchange
-      const p = r.pick(state.planets);
-      const bull = roll === 11;
-      p.exchange.trend = bull ? 0.8 : 0.2;
-      log(
-        state,
-        -1,
-        'news',
-        `Kuku News: analysts turn ${bull ? 'bullish' : 'bearish'} on ${PLANET_BY_ID[p.id].exchange}.`,
-      );
-      return;
-    }
-    default:
-      return;
-  }
+export function taxOwed(co: CompanyState): number {
+  return co.taxOwedPassenger + co.taxOwedTariff;
 }
+
+/** The tax screen turns red at this point, and an audit becomes possible. */
+export function taxIsDangerous(co: CompanyState): boolean {
+  return taxOwed(co) >= 35 * co.ship.tons;
+}
+
+export function commodityName(c: CommodityId): string {
+  return COMMODITY_BY_ID[c].name;
+}
+
+export function levelOf(state: GameState) {
+  return LEVEL_BY_ID(state.settings.level);
+}
+
+export type { Phase };

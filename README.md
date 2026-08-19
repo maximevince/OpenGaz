@@ -4,7 +4,7 @@
 game you can play in the browser, solo, hot-seat with friends on one screen, or online.**
 
 > Status: playable alpha. Solo vs. computer companies, hot-seat, play-by-link and peer-to-peer
-> online rooms all work; balance and artwork are still rough (see roadmap in `docs/DESIGN.md`).
+> online rooms all work; balance and artwork are still being refined.
 
 Buy low on one planet, fly your bug-shaped freighter across Kukubia, sell high on another. Juggle
 passengers, fuel, crew wages, taxes, insurance, warehouses, the stock exchanges, the Trader's Union
@@ -19,15 +19,15 @@ and the fickle Mr. Zinn — and out-trade six rival companies (or your brother a
 - 100 % free and open: code and runtime sound presets under GPL-3.0-or-later; recreated artwork
   under CC BY-SA 4.0.
 
-## Legal / clean-room notice
+## Legal notice
 
 OpenGaz is a fan re-implementation and is **not affiliated with or endorsed by LavaMind**.
 _Gazillionaire_ is LavaMind's game and trademark; the original is still sold — go buy it.
 
-The rules are re-implemented from the manual, public community documentation and by observing the
-original play. **No original artwork, sound, text or code is included** in this repository or in
-any build. Planet, character and item names are used as homage. Recreated assets live in `assets/`
-with provenance in `assets/SOURCES.md`.
+Game mechanics are not copyrightable; their expression is. **No original code, artwork, sound or
+text is included** in this repository or in any build: every line of code, every string of
+dialogue and every image and sound is our own work. Planet, character and item names are kept as
+homage. Recreated assets live in `assets/` with provenance in `assets/SOURCES.md`.
 
 Developers who own the original CD may import its media into a local, git-ignored dev-only pack
 (`pnpm assets:original`) purely to speed up UI work; CI fails if such files are ever tracked.
@@ -67,10 +67,8 @@ src/engine/   pure, deterministic game rules (no DOM) — data tables, reducer, 
 src/ui/       Svelte screens on a 640×480 virtual stage
 src/net/      transports: local hot-seat, play-by-link, P2P (Trystero) …
 assets/       recreated art & sound masters, prompt sheets, SOURCES.md (see docs/ASSETS.md)
-docs/         design reference
+docs/         asset pipeline and artwork notes
 ```
-
-See `docs/DESIGN.md` for the game design reference and roadmap.
 
 ## License
 
