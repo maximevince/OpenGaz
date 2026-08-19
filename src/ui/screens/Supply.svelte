@@ -5,6 +5,8 @@
   const co = $derived(game.co);
   const s = $derived(game.s);
   let sel: number | null = $state(null);
+  /** distances are unrounded Euclidean — one decimal is plenty on screen */
+  const dist = (to: number) => distanceBetween(s, co.planet, to).toFixed(1);
   // lowest supply per commodity (red arrow), and per planet lowest
   const lowest = $derived(
     Object.fromEntries(
@@ -24,42 +26,41 @@
     0% = rare and expensive · 100% = plentiful and cheap. ◆ = you. Click a planet column to see the
     distance.
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th></th>
-        {#each s.planets as p, i (p.id)}
-          <th class:me={i === co.planet} class:sel={sel === i} onclick={() => (sel = i)}>
-            {PLANET_BY_ID[p.id].name}{i === co.planet ? ' ◆' : ''}
-          </th>
-        {/each}
-      </tr>
-    </thead>
-    <tbody>
-      {#each s.commodities as c (c)}
+  <div class="grid">
+    <table>
+      <thead>
         <tr>
-          <td class="name">{COMMODITY_BY_ID[c].name}</td>
+          <th></th>
           {#each s.planets as p, i (p.id)}
-            <td class:low={lowest[c] === i} class:sel={sel === i}
-              >{Math.round(p.supply[c] ?? 0)}%</td
-            >
+            <th class:me={i === co.planet} class:sel={sel === i} onclick={() => (sel = i)}>
+              {PLANET_BY_ID[p.id].name}{i === co.planet ? ' ◆' : ''}
+            </th>
           {/each}
         </tr>
-      {/each}
-      <tr class="dist">
-        <td class="name">Distance</td>
-        {#each s.planets as p, i (p.id)}
-          <td class:sel={sel === i}
-            >{i === co.planet ? '—' : `${distanceBetween(s, co.planet, i)}`}</td
-          >
+      </thead>
+      <tbody>
+        {#each s.commodities as c (c)}
+          <tr>
+            <td class="name">{COMMODITY_BY_ID[c].name}</td>
+            {#each s.planets as p, i (p.id)}
+              <td class:low={lowest[c] === i} class:sel={sel === i}
+                >{Math.round(p.supply[c] ?? 0)}%</td
+              >
+            {/each}
+          </tr>
         {/each}
-      </tr>
-    </tbody>
-  </table>
+        <tr class="dist">
+          <td class="name">Distance</td>
+          {#each s.planets as p, i (p.id)}
+            <td class:sel={sel === i}>{i === co.planet ? '—' : dist(i)}</td>
+          {/each}
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <div class="foot">
     {#if sel !== null && sel !== co.planet}
-      {PLANET_BY_ID[s.planets[sel]!.id].name} is {distanceBetween(s, co.planet, sel)} million kuters away
-      · about
+      {PLANET_BY_ID[s.planets[sel]!.id].name} is {dist(sel)} million kuters away · about
       {((distanceBetween(s, co.planet, sel) * 5) / co.ship.kuarps).toFixed(1)} days at {co.ship
         .kuarps} kuarps
     {:else}
@@ -81,40 +82,50 @@
     background: var(--c-periwinkle);
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 6px;
+    gap: 4px;
+    padding: 5px;
     box-sizing: border-box;
     color: #000;
   }
   .title {
     background: var(--c-navy);
     color: #fff;
-    font: bold 14px var(--font-ui);
+    font: bold 13px/1.2 var(--font-ui);
     text-align: center;
-    padding: 5px;
+    padding: 3px;
   }
   .hint,
   .foot {
     background: #000;
     color: var(--c-green-grid);
-    font: bold 11px var(--font-ui);
+    font: bold 10px/1.2 var(--font-ui);
     text-align: center;
-    padding: 4px;
+    padding: 3px;
+  }
+  /* elastic, scrolling block — keeps the button row on screen */
+  .grid {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
   table {
     border-collapse: collapse;
+    table-layout: fixed;
     width: 100%;
-    flex: 1;
+    height: 100%;
     background: var(--c-green-grid);
-    font: bold 12px var(--font-ui);
+    font: bold 11px/1.15 var(--font-ui);
   }
   th,
   td {
     border: 1px solid #000;
-    padding: 3px;
+    padding: 1px 3px;
     text-align: center;
   }
   th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     background: var(--c-face);
     cursor: pointer;
   }
@@ -125,10 +136,21 @@
     outline: 2px solid #ff0;
     outline-offset: -2px;
   }
+  td.name,
+  thead th:first-child {
+    width: 88px;
+  }
   td.name {
     background: var(--c-face);
     text-align: left;
-    padding-left: 8px;
+    padding-left: 6px;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  th {
+    font-size: 11px;
   }
   td.low {
     color: #c00000;
@@ -139,11 +161,11 @@
   }
   .buttons {
     display: flex;
-    gap: 6px;
+    gap: 4px;
   }
   .buttons :global(.btn) {
     flex: 1;
-    font-size: 15px;
-    padding: 6px;
+    font-size: 13px;
+    padding: 4px;
   }
 </style>

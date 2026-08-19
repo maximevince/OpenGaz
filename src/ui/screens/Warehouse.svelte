@@ -30,45 +30,48 @@
     Goods in a warehouse pay no tariffs and wait for a better price. Extra space is offered by the
     Trader's Union lottery.
   </div>
-  <table>
-    <thead
-      ><tr
-        ><th>Commodity</th><th>On ship</th><th>In warehouse</th><th>Paid</th><th></th><th></th></tr
-      ></thead
-    >
-    <tbody>
-      {#each game.s.commodities as c (c)}
-        {@const onShip = co.cargo[c]?.tons ?? 0}
-        {@const stored = wh[c]?.tons ?? 0}
-        <tr>
-          <td class="name">{COMMODITY_BY_ID[c].name}</td>
-          <td>{onShip}</td>
-          <td>{stored}</td>
-          <td>{wh[c] ? fmt(wh[c]!.paid) : '—'}</td>
-          <td
-            ><Btn
-              color="green"
-              disabled={onShip === 0 || used >= cap}
-              onclick={() => (prompt = { mode: 'store', c, max: Math.min(onShip, cap - used) })}
-              >Store ▶</Btn
-            ></td
-          >
-          <td
-            ><Btn
-              color="green"
-              disabled={stored === 0 || cargoTons(co) >= co.ship.cargo}
-              onclick={() =>
-                (prompt = {
-                  mode: 'retrieve',
-                  c,
-                  max: Math.min(stored, co.ship.cargo - cargoTons(co)),
-                })}>◀ Load</Btn
-            ></td
-          >
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+  <div class="grid">
+    <table>
+      <thead
+        ><tr
+          ><th>Commodity</th><th>On ship</th><th>In warehouse</th><th>Paid</th><th></th><th
+          ></th></tr
+        ></thead
+      >
+      <tbody>
+        {#each game.s.commodities as c (c)}
+          {@const onShip = co.cargo[c]?.tons ?? 0}
+          {@const stored = wh[c]?.tons ?? 0}
+          <tr>
+            <td class="name">{COMMODITY_BY_ID[c].name}</td>
+            <td>{onShip}</td>
+            <td>{stored}</td>
+            <td>{wh[c] ? fmt(wh[c]!.paid) : '—'}</td>
+            <td
+              ><Btn
+                color="green"
+                disabled={onShip === 0 || used >= cap}
+                onclick={() => (prompt = { mode: 'store', c, max: Math.min(onShip, cap - used) })}
+                >Store ▶</Btn
+              ></td
+            >
+            <td
+              ><Btn
+                color="green"
+                disabled={stored === 0 || cargoTons(co) >= co.ship.cargo}
+                onclick={() =>
+                  (prompt = {
+                    mode: 'retrieve',
+                    c,
+                    max: Math.min(stored, co.ship.cargo - cargoTons(co)),
+                  })}>◀ Load</Btn
+              ></td
+            >
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
   <div class="buttons">
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
     <Btn onclick={() => game.go('market')}>Marketplace</Btn>
@@ -102,43 +105,54 @@
     background: var(--c-periwinkle);
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px;
+    gap: 4px;
+    padding: 5px;
     box-sizing: border-box;
     color: #000;
   }
   .title {
     background: var(--c-navy);
     color: #fff;
-    font: bold 15px var(--font-ui);
+    font: bold 13px/1.2 var(--font-ui);
     text-align: center;
-    padding: 5px;
+    padding: 3px;
   }
   .plates {
     display: flex;
-    gap: 8px;
+    gap: 6px;
   }
   .plates :global(.plate) {
     flex: 1;
   }
   .hint {
-    font: 12px var(--font-ui);
+    font: 10px/1.2 var(--font-ui);
+  }
+  /* elastic, scrolling block — keeps the button row on screen */
+  .grid {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
   table {
     border-collapse: collapse;
     width: 100%;
+    height: 100%;
     background: var(--c-green-grid);
-    font: bold 12px var(--font-ui);
-    flex: 1;
+    font: bold 11px/1.15 var(--font-ui);
   }
   th,
   td {
     border: 1px solid #000;
-    padding: 2px 4px;
+    padding: 0 4px;
     text-align: center;
   }
   th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     background: var(--c-face);
+    font-size: 10px;
+    padding: 2px 4px;
   }
   td.name {
     background: var(--c-face);
@@ -146,16 +160,17 @@
     padding-left: 8px;
   }
   td :global(.btn) {
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 0 6px;
+    font-size: 10px;
+    border-width: 1px;
   }
   .buttons {
     display: flex;
-    gap: 6px;
+    gap: 4px;
   }
   .buttons :global(.btn) {
     flex: 1;
-    font-size: 15px;
-    padding: 6px;
+    font-size: 13px;
+    padding: 4px;
   }
 </style>
