@@ -66,6 +66,10 @@ export const HELP: Partial<Record<Screen, { title: string; text: string }>> = {
     title: 'Galaxy Map',
     text: 'Click a planet to fly there. Distance divided by your engine speed (kuarps) gives the travel time; the fastest arrivals trade first next week. Check the Supply Chart to pick where your cargo will fetch the most.',
   },
+  charts: {
+    title: 'Distances & Facilities',
+    text: "The distance chart shows every company's ship, its engine speed, and how far it sits from the planet you picked on the left — the same numbers that decide who reaches next week's market first. The facilities chart shows who owns the government facilities Emperor Dred privatises. Their owner charges every other company a landing fee on arrival; the fees pile up on the planet and are only collected when the owner lands there.",
+  },
   explore: {
     title: 'Explore Planet',
     text: 'Every planet has a Special institution worth a visit — banking favours, insurance reviews, upgrades, blessings, casinos and smugglers. The Weather Bureau warns of hazards, the News Center reports what moves the markets, and the Histories tell you how Kukubia got this way.',

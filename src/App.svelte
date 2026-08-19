@@ -26,6 +26,7 @@
   import Fuel from './ui/screens/Fuel.svelte';
   import FileOptions from './ui/screens/FileOptions.svelte';
   import Map from './ui/screens/Map.svelte';
+  import Charts from './ui/screens/Charts.svelte';
   import Event from './ui/screens/Event.svelte';
   import Arrival from './ui/screens/Arrival.svelte';
   import GameOver from './ui/screens/GameOver.svelte';
@@ -65,6 +66,7 @@
     fuel: Fuel,
     file: FileOptions,
     map: Map,
+    charts: Charts,
     travel: Arrival,
     event: Event,
     arrival: Arrival,
