@@ -7,6 +7,7 @@
   import Title from './ui/screens/Title.svelte';
   import Setup from './ui/screens/Setup.svelte';
   import Handoff from './ui/screens/Handoff.svelte';
+  import Report from './ui/screens/Report.svelte';
   import MainMenu from './ui/screens/MainMenu.svelte';
   import Marketplace from './ui/screens/Marketplace.svelte';
   import Supply from './ui/screens/Supply.svelte';
@@ -45,6 +46,7 @@
   const screens = {
     setup: Setup,
     handoff: Handoff,
+    report: Report,
     menu: MainMenu,
     market: Marketplace,
     supply: Supply,
@@ -83,7 +85,7 @@
   {:else if Current}
     <Current />
   {/if}
-  {#if game.state?.pending && game.state.phase !== 'event' && game.screen !== 'event' && game.screen !== 'title'}
+  {#if game.state?.pending && game.state.phase !== 'event' && game.screen !== 'event' && game.screen !== 'title' && game.screen !== 'report'}
     <Event />
   {/if}
   <HelpDialog />

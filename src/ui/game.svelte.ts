@@ -23,6 +23,7 @@ export type Screen =
   | 'title'
   | 'setup'
   | 'handoff'
+  | 'report'
   | 'menu'
   | 'market'
   | 'supply'
@@ -80,6 +81,8 @@ class GameStore {
   helpFor = $state<Screen | null>(null);
   /** company index the UI is currently showing (for hot-seat handoff detection) */
   private shownCompany = -1;
+  /** last week whose standings report has been shown (once per week, not per player) */
+  private reportedWeek = -1;
 
   constructor() {
     online.onRemoteAction = (a) => this.applyRemote(a);
@@ -98,6 +101,7 @@ class GameStore {
   private adopt(s: GameState) {
     this.state = s;
     this.shownCompany = -1;
+    this.reportedWeek = s.week;
     this.afterChange();
   }
 
@@ -133,6 +137,12 @@ class GameStore {
     this.screen = screen;
   }
 
+  /** dismiss the weekly standings and route on to whatever comes next */
+  closeReport() {
+    this.error = null;
+    if (this.state) this.afterChange();
+  }
+
   help(screen?: Screen) {
     this.helpFor = screen ?? this.screen;
   }
@@ -140,6 +150,7 @@ class GameStore {
   start(opts: NewGameOptions) {
     this.state = newGame(opts);
     this.shownCompany = -1;
+    this.reportedWeek = this.state.week;
     this.afterChange();
   }
 
@@ -186,6 +197,13 @@ class GameStore {
       // someone else's turn: spectate
       this.shownCompany = currentIndex(s);
       this.screen = 'waiting';
+      this.autosave();
+      return;
+    }
+    // the week rolled over: everyone sees the standings once before play resumes
+    if (s.week !== this.reportedWeek) {
+      this.reportedWeek = s.week;
+      this.screen = 'report';
       this.autosave();
       return;
     }
@@ -285,6 +303,7 @@ class GameStore {
     try {
       this.state = deserialize(j);
       this.shownCompany = -1;
+      this.reportedWeek = this.state.week;
       this.afterChange();
       return true;
     } catch (e) {
@@ -306,6 +325,7 @@ class GameStore {
     try {
       this.state = decodeFromLink(m[1]!);
       this.shownCompany = -1;
+      this.reportedWeek = this.state.week;
       history.replaceState(null, '', location.pathname);
       this.afterChange();
       return true;
