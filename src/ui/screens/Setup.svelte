@@ -35,6 +35,11 @@
   const canStart = $derived(
     planets.length === 7 && humans.every((h) => h.name.trim()) && humans.length + ai >= 2,
   );
+  const selectedShip = $derived(shipPick === null ? undefined : humans[shipPick]?.ship);
+  const selectedShipDef = $derived(SHIPS.find((s) => s.id === selectedShip));
+  const selectedShipPicture = $derived(
+    selectedShip === undefined ? undefined : img(`ship.${selectedShip}.picture`),
+  );
   function start() {
     game.start({
       seed,
@@ -129,6 +134,17 @@
     <div class="backdrop" role="presentation">
       <div class="dlg">
         <div class="dlg-title">Choose a ship for {humans[shipPick]!.name}</div>
+        {#if selectedShipDef}
+          <div class="dealer-preview">
+            {#if selectedShipPicture}<img src={selectedShipPicture} alt={selectedShipDef.name} />{/if}
+            <div>
+              <b>{selectedShipDef.name}</b>
+              <span
+                >{selectedShipDef.cargo}t cargo · {selectedShipDef.seats} passengers · {selectedShipDef.fuel}t fuel · {selectedShipDef.kuarps} kuarps</span
+              >
+            </div>
+          </div>
+        {/if}
         <div class="ships">
           {#each SHIPS as sdef (sdef.id)}
             {@const pic = img(`ship.${sdef.id}.icon`)}
@@ -137,7 +153,6 @@
               class:on={humans[shipPick!]!.ship === sdef.id}
               onclick={() => {
                 humans[shipPick!]!.ship = sdef.id;
-                shipPick = null;
               }}
             >
               {#if pic}<img src={pic} alt="" />{/if}
@@ -148,7 +163,10 @@
             </button>
           {/each}
         </div>
-        <Btn onclick={() => (shipPick = null)}>Cancel</Btn>
+        <div class="ship-actions">
+          <Btn onclick={() => (shipPick = null)}>Cancel</Btn>
+          <Btn color="green" onclick={() => (shipPick = null)}>Choose {selectedShipDef?.name}</Btn>
+        </div>
       </div>
     </div>
   {/if}
@@ -247,7 +265,10 @@
   }
   .pl img {
     width: 22px;
-    height: 22px;
+    height: auto;
+    max-height: 22px;
+    object-fit: contain;
+    flex: 0 0 22px;
   }
   .pl.on {
     background: var(--c-yellow-plate);
@@ -342,5 +363,39 @@
   .sh.on {
     background: var(--c-yellow-plate);
     border-color: #000;
+  }
+  .dealer-preview {
+    height: 100px;
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    align-items: center;
+    gap: 10px;
+    background: #000;
+    color: #fff;
+    padding: 4px;
+  }
+  .dealer-preview img {
+    width: 160px;
+    height: 92px;
+    object-fit: contain;
+  }
+  .dealer-preview div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .dealer-preview b {
+    color: var(--c-yellow-plate);
+    font-size: 15px;
+  }
+  .dealer-preview span {
+    font-size: 11px;
+  }
+  .ship-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .ship-actions :global(.btn) {
+    flex: 1;
   }
 </style>

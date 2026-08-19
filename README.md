@@ -16,7 +16,8 @@ and the fickle Mr. Zinn — and out-trade six rival companies (or your brother a
 - KISS: static web app, no accounts, no server needed to play.
 - Multiplayer like it was: hot-seat on one machine, "play-by-link" (the modern play-by-email),
   and peer-to-peer online rooms.
-- 100 % free software: code **and** recreated art/sound under GPL-3.0-or-later.
+- 100 % free and open: code and runtime sound presets under GPL-3.0-or-later; recreated artwork
+  under CC BY-SA 4.0.
 
 ## Legal / clean-room notice
 
@@ -73,4 +74,5 @@ See `docs/DESIGN.md` for the game design reference and roadmap.
 
 ## License
 
-GPL-3.0-or-later — see `LICENSE`.
+Code and runtime sound presets are GPL-3.0-or-later — see `LICENSE`. Recreated artwork is
+[CC BY-SA 4.0](assets/ARTWORK_LICENSE.md).

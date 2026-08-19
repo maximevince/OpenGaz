@@ -1,6 +1,7 @@
 # Recreated assets — plan & spec sheet
 
-How OpenGaz gets its own art and sound (GPL-3.0-or-later, no LavaMind material).
+How OpenGaz gets its own art and sound (artwork CC BY-SA 4.0; code and sound presets
+GPL-3.0-or-later; no LavaMind material).
 
 ## 1. Ground rules
 
@@ -8,9 +9,8 @@ How OpenGaz gets its own art and sound (GPL-3.0-or-later, no LavaMind material).
   material for recreated artwork. Reference the _ideas_ (a junkyard planet, a casino planet, a bug-shaped freighter,
   a grumpy tax collector) — never the pixels or waveforms. The dev-only `original` pack exists
   only so UI work is not blocked; it is git-ignored and CI fails if it is ever tracked.
-- Every shipped file has a row in `assets/SOURCES.md`: path, what, how made (tool + prompt id or
-  source URL + author), licence. Only GPL-compatible sources: our own generations (released
-  under GPL/CC0), CC0, CC-BY 4.0 (attribution kept in SOURCES.md), GPL.
+- Every shipped file has a row in `assets/SOURCES.md`: path, what, and licence. Artwork is
+  released under CC BY-SA 4.0; code and sound presets retain their stated licences.
 - Names (Bass, Zinn, Dred, kubars…) are homage; visuals must be **our own take**, not look-alikes.
 - Style target: "1996 CD-ROM": chunky pre-rendered 3D-ish planets and ships, saturated colours,
   black space, hand-drawn cartoon aliens with big expressions. Coherent across the set (same
@@ -21,7 +21,6 @@ How OpenGaz gets its own art and sound (GPL-3.0-or-later, no LavaMind material).
 ```
 assets/
   SOURCES.md          provenance table (mandatory)
-  prompts/            one .md per category: base style + per-id prompt (this doc summarises)
   src/gfx/<id path>.png   masters as generated (≥ target size, PNG/webp)
   src/sfx/<id>.wav        masters (mono 22 kHz is plenty)
 public/assets/        BUILT output, committed (small, optimised) + manifest.json
@@ -93,8 +92,8 @@ Puffer Inc., Roke Transport, Hoff Meister — a mascot/CEO + logo each.
 ## 4. Art direction and production
 
 Artwork masters live in `assets/src/gfx/` and are built into the shipped pack by the same asset
-pipeline. Each piece must be original OpenGaz artwork and released under a GPL-compatible licence.
-The prompt sheets in `assets/prompts/` are art-direction briefs for maintaining a coherent set:
+pipeline. Each piece must be original OpenGaz artwork and released under CC BY-SA 4.0.
+The art-direction briefs maintain a coherent set:
 
 ```
 [BASE]  1996 CD-ROM game art, pre-rendered 3D look, chunky shapes, saturated colours, soft
@@ -151,7 +150,7 @@ Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WA
 1. `scripts/build-assets.mjs` + `pnpm assets:build` (manifest from `assets/src`) — done with
    this doc.
 2. `src/ui/sound.ts` (ZzFX + mute toggle + `sfx()` from packs) and hook ~15 call sites.
-3. Prompt sheets `assets/prompts/{planets,ships,portraits,screens}.md`.
-4. Generate: title + 14 planet larges + 12 ships first (most visible), then portraits, then
+3. Create art-direction briefs for planets, ships, portraits, and screens.
+4. Create: title + 14 planet larges + 12 ships first (most visible), then portraits, then
    surfaces/icons; iterate style until coherent; commit masters + built output + SOURCES rows.
 5. CC0 sfx pass; optional music.

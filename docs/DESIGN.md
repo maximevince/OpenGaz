@@ -164,7 +164,8 @@ Portrait screens can optionally turn the stage a quarter-turn (`Rotate to fill`,
 
 The UI resolves images/sounds through an **asset pack** abstraction:
 
-- `opengaz` (default, in `assets/` → `public/assets/`): recreated art & sound, GPL.
+- `opengaz` (default, in `assets/` → `public/assets/`): recreated artwork, CC BY-SA 4.0; sound
+  presets, GPL.
 - `original` (dev-only, `public/original/`, git-ignored, imported with `pnpm assets:original`
   from the owner's CD): used only to speed up early UI work; if the folder is missing the app
   silently falls back to `opengaz`/placeholders. Never committed or deployed (CI guard).
