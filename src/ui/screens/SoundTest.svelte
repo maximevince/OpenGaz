@@ -7,6 +7,7 @@
   import { COMMODITY_BY_ID, type CommodityId } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
+  import { activePack } from '../assets';
   import { hasSample, play, soundIds } from '../sound';
 
   const GROUPS: { title: string; ids: string[] }[] = [
@@ -76,9 +77,8 @@
 
 <div class="st">
   <div class="title">
-    Sound Test — {all.length} ids · {all.filter(hasSample).length} from samples, {all.filter(
-      (i) => !hasSample(i),
-    ).length} synthesised
+    Sound Test — {all.length} ids · {all.filter(hasSample).length} from the “{activePack()}” pack,
+    {all.filter((i) => !hasSample(i)).length} synthesised
   </div>
 
   <div class="body">
