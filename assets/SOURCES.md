@@ -12,3 +12,4 @@ project artwork; no LavaMind artwork is included.
 | `src/gfx/bg/stars/1.png`                                                                                                 | Journey map background                        | CC BY-SA 4.0                                |
 | `src/gfx/screen/{win,lose}.png`                                                                                          | Victory and loss screen backgrounds           | CC BY-SA 4.0                                |
 | `src/gfx/portrait/op{1-6}.png`                                                                                           | Rival-company creature cards                  | CC BY-SA 4.0                                |
+| `src/gfx/portrait/{bank,zinn,union,insurance,tax,crew,broker,dealer,warehouse,mechanic}.png`                             | Service portraits and warehouse scene         | CC BY-SA 4.0                                |
