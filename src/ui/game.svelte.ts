@@ -3,7 +3,7 @@
  * and decides which screen is showing. All rules live in src/engine — this file only glues.
  */
 import { online } from '../net/online.svelte';
-import { play } from './sound';
+import { hasSample, play } from './sound';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
@@ -73,7 +73,10 @@ function soundForTrade(s: GameState, a: Extract<Action, { type: 'buy' | 'sell' }
     COMMODITY_BY_ID[a.commodity],
     LEVEL_BY_ID(s.settings.level).difficulty,
   );
-  return tradeSound(a, price, paid, max);
+  const id = tradeSound(a, price, paid, max);
+  // Per-commodity samples are a nice-to-have the shipped pack does not carry yet; without one,
+  // the plain buy/sell sample beats the synth chime for the most frequent action in the game.
+  return id.startsWith('commodity.') && !hasSample(id) ? a.type : id;
 }
 
 class GameStore {

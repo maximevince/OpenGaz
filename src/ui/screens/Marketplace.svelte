@@ -87,7 +87,14 @@
     {quick
       ? 'Quick Buy: a click sells what you carry, or buys all you can. Right-click for the full dialog.'
       : 'Click on the commodity you wish to buy or sell.'}
-    <button class="quick" class:on={quick} onclick={() => shortcuts.toggle(co.id, 'buy')}>
+    <button
+      class="quick"
+      class:on={quick}
+      onclick={() => {
+        play('click');
+        shortcuts.toggle(co.id, 'buy');
+      }}
+    >
       Quick Buy {quick ? 'ON' : 'OFF'}
     </button>
   </div>

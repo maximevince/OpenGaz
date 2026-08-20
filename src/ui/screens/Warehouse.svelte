@@ -11,6 +11,7 @@
   import Prompt from '../components/Prompt.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
   import { shortcuts } from '../shortcuts.svelte';
   const co = $derived(game.co);
   const pi = $derived(co.planet);
@@ -53,7 +54,14 @@
         ? 'Quick Warehouse: a click loads what is stored, or stores what you carry.'
         : "Goods in a warehouse pay no tariffs and wait for a better price. Extra space is offered by the Trader's Union lottery."}
     </span>
-    <button class="quick" class:on={quick} onclick={() => shortcuts.toggle(co.id, 'warehouse')}>
+    <button
+      class="quick"
+      class:on={quick}
+      onclick={() => {
+        play('click');
+        shortcuts.toggle(co.id, 'warehouse');
+      }}
+    >
       Quick Warehouse {quick ? 'ON' : 'OFF'}
     </button>
   </div>
