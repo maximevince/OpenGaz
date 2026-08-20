@@ -4,15 +4,19 @@
  */
 import { online } from '../net/online.svelte';
 import { play } from './sound';
+import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
   applyAction,
+  COMMODITY_BY_ID,
   currentCompany,
   currentIndex,
   decodeFromLink,
   deserialize,
   encodeForLink,
+  LEVEL_BY_ID,
   newGame,
+  priceRange,
   serialize,
   type Action,
   type GameState,
@@ -43,6 +47,7 @@ export type Screen =
   | 'fuel'
   | 'file'
   | 'shortcuts'
+  | 'soundtest'
   | 'map'
   | 'charts'
   | 'travel'
@@ -53,28 +58,23 @@ export type Screen =
   | 'gameover';
 
 const AUTOSAVE_KEY = 'opengaz.autosave';
-/** feedback sound per successful action (ids from src/ui/sound.ts) */
-const ACTION_SOUND: Partial<Record<Action['type'], string>> = {
-  buy: 'buy',
-  sell: 'sell',
-  store: 'buy',
-  retrieve: 'sell',
-  stockBuy: 'buy',
-  stockSell: 'sell',
-  buyFuel: 'buy',
-  buyInsurance: 'coins',
-  payCrew: 'coins',
-  payTaxes: 'coins',
-  bankDeposit: 'coins',
-  bankWithdraw: 'coins',
-  unionBorrow: 'cash',
-  unionRepay: 'coins',
-  zinnRepay: 'coins',
-  pickupPassengers: 'coins',
-  advertise: 'coins',
-  journey: 'rocket',
-};
 const SLOT_KEY = (n: number) => `opengaz.save.${n}`;
+
+/**
+ * The noise a trade makes: the commodity's own, or the deal verdict when selling. Computed from
+ * the state *before* the action, because selling wipes the average purchase price it compares to.
+ */
+function soundForTrade(s: GameState, a: Extract<Action, { type: 'buy' | 'sell' }>): string {
+  const co = currentCompany(s);
+  const p = s.planets[co.planet];
+  const price = p?.price[a.commodity] ?? 0;
+  const paid = co.cargo[a.commodity]?.paid ?? 0;
+  const { max } = priceRange(
+    COMMODITY_BY_ID[a.commodity],
+    LEVEL_BY_ID(s.settings.level).difficulty,
+  );
+  return tradeSound(a, price, paid, max);
+}
 
 class GameStore {
   state = $state.raw<GameState | null>(null);
@@ -137,6 +137,7 @@ class GameStore {
 
   go(screen: Screen) {
     this.error = null;
+    if (screen !== this.screen) play(SCREEN_SOUND[screen] ?? '', 0.7);
     this.screen = screen;
   }
 
@@ -147,6 +148,7 @@ class GameStore {
   }
 
   help(screen?: Screen) {
+    play('help');
     this.helpFor = screen ?? this.screen;
   }
 
@@ -171,6 +173,7 @@ class GameStore {
       this.error = 'It is not your turn.';
       return false;
     }
+    const trade = a.type === 'buy' || a.type === 'sell' ? soundForTrade(this.state, a) : '';
     try {
       this.state = applyAction(this.state, a);
       this.error = null;
@@ -179,7 +182,7 @@ class GameStore {
       play('error');
       return false;
     }
-    play(ACTION_SOUND[a.type] ?? '');
+    play(trade || ACTION_SOUND[a.type] || '');
     if (online.active) online.broadcastAction(a, this.state);
     this.afterChange();
     return true;
@@ -191,8 +194,11 @@ class GameStore {
     if (s.phase === 'gameOver' || s.phase === 'winner') {
       this.state = s;
       this.screen = 'gameover';
-      if (s.phase === 'gameOver')
-        play(s.winner !== null && !s.companies[s.winner]!.isAI ? 'win' : 'lose');
+      if (s.phase === 'gameOver') {
+        const humans = s.companies.filter((c) => !c.isAI);
+        const wonByHuman = s.winner !== null && !s.companies[s.winner]!.isAI;
+        play(wonByHuman ? 'win' : humans.every((c) => c.bankrupt) ? 'bankrupt' : 'lose');
+      }
       this.autosave();
       return;
     }
@@ -218,7 +224,7 @@ class GameStore {
       return;
     }
     if (s.phase === 'event') {
-      if (this.screen !== 'event') play(`event.${s.pending?.mood ?? 'neutral'}`);
+      if (this.screen !== 'event') play(eventSound(s.pending?.id, s.pending?.mood));
       this.screen = 'event';
       this.autosave();
       return;

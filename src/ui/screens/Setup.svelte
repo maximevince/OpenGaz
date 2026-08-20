@@ -11,6 +11,7 @@
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
 
   let level: Level = $state('novice');
   let opponents: string[] = $state(OPPONENTS.slice(0, 5).map((o) => o.id));
@@ -29,8 +30,13 @@
     return ids.slice(0, 7);
   }
   function toggle(id: PlanetId) {
+    play('ping');
     if (planets.includes(id)) planets = planets.filter((p) => p !== id);
     else if (planets.length < 7) planets = [...planets, id];
+  }
+  function toggleOpponent(id: string) {
+    play('ping');
+    opponents = opponents.includes(id) ? opponents.filter((x) => x !== id) : [...opponents, id];
   }
   const canStart = $derived(
     planets.length === 7 && humans.every((h) => h.name.trim()) && humans.length + ai >= 2,
@@ -60,8 +66,12 @@
       {#each humans as h, i (i)}
         <div class="row">
           <input class="name" bind:value={h.name} placeholder="Company name" maxlength="24" />
-          <button class="ship" onclick={() => (shipPick = i)}
-            >{SHIPS.find((s) => s.id === h.ship)?.name}</button
+          <button
+            class="ship"
+            onclick={() => {
+              play('select');
+              shipPick = i;
+            }}>{SHIPS.find((s) => s.id === h.ship)?.name}</button
           >
           <Btn
             disabled={humans.length <= 1}
@@ -86,8 +96,7 @@
             class:on
             title={o.blurb}
             disabled={!on && humans.length + ai >= 7}
-            onclick={() =>
-              (opponents = on ? opponents.filter((x) => x !== o.id) : [...opponents, o.id])}
+            onclick={() => toggleOpponent(o.id)}
           >
             <img src={img(`portrait.op${i + 1}`)} alt="" />
             <span>{o.name}</span>
@@ -156,6 +165,7 @@
               class="sh"
               class:on={humans[shipPick!]!.ship === sdef.id}
               onclick={() => {
+                play('select');
                 humans[shipPick!]!.ship = sdef.id;
               }}
             >

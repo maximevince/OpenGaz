@@ -3,6 +3,8 @@
   import Btn from '../components/Btn.svelte';
   import Portrait from '../components/Portrait.svelte';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
+  import { EXPLORE_SOUND } from '../soundmap';
   const s = $derived(game.s);
   const co = $derived(game.co);
   const p = $derived(game.planet);
@@ -14,6 +16,11 @@
   $effect(() => {
     if (!full && (tab === 'special' || tab === 'news' || tab === 'weather')) tab = 'time';
   });
+  /** each part of the city has its own greeting */
+  function show(t: Tab) {
+    tab = t;
+    play(EXPLORE_SOUND[t] ?? '', 0.7);
+  }
   const headline = $derived(newsHeadline(s));
   const olderNews = $derived(
     s.log
@@ -97,12 +104,12 @@
   <div class="buttons">
     <Btn color="blue" onclick={() => game.go('menu')}>Continue</Btn>
     {#if full}
-      <Btn color="blue" onclick={() => (tab = 'special')}>Planet Special</Btn>
-      <Btn color="blue" onclick={() => (tab = 'weather')}>Weather Bureau</Btn>
-      <Btn color="blue" onclick={() => (tab = 'news')}>News Center</Btn>
+      <Btn color="blue" onclick={() => show('special')}>Planet Special</Btn>
+      <Btn color="blue" onclick={() => show('weather')}>Weather Bureau</Btn>
+      <Btn color="blue" onclick={() => show('news')}>News Center</Btn>
     {/if}
-    <Btn color="blue" onclick={() => (tab = 'time')}>Ministry of Time</Btn>
-    <Btn color="blue" onclick={() => (tab = 'history')}>History</Btn>
+    <Btn color="blue" onclick={() => show('time')}>Ministry of Time</Btn>
+    <Btn color="blue" onclick={() => show('history')}>History</Btn>
     <Btn color="blue" onclick={() => game.help('explore')}>Help</Btn>
   </div>
 </div>

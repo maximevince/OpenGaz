@@ -4,6 +4,7 @@
   import Prompt from '../components/Prompt.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
   const s = $derived(game.s);
   const co = $derived(game.co);
   let view = $state(-1); // -1 = local exchange
@@ -16,6 +17,10 @@
     ex.crashed || co.stockBoughtThisWeek ? 0 : Math.floor((0.5 * (co.cash + co.bank)) / ex.price),
   );
   let mode: 'buy' | 'sell' | null = $state(null);
+  /** a crashed board announces itself — the shares are already gone by the time you look */
+  $effect(() => {
+    if (ex.crashed) play('stock.crash');
+  });
 
   // chart geometry
   const W = 400,
