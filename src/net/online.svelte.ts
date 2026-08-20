@@ -5,9 +5,17 @@
  * current company may act, and their actions are broadcast and applied by everyone in order.
  * AI turns are computed locally by each peer (deterministic from the shared state).
  * Late joiners / reconnects ask the host for a full state snapshot.
+ *
+ * Peers are not trusted to be correct (nor honest), so every inbound message is checked:
+ *   - an action is only accepted from the peer sitting in the seat whose turn it is;
+ *   - actions form one global sequence, so a gap means we missed one — snapshot instead;
+ *   - each action carries the sender's post-action week/turn/rng, which must match ours after
+ *     we apply it, otherwise the two engines have silently diverged — snapshot instead;
+ *   - lobby/start/sync only count when they come from the host.
+ * Every one of those failures resolves the same way: ask the host for a fresh snapshot.
  */
 import { joinRoom, selfId, type Room } from 'trystero/nostr';
-import type { Action, GameState, Level, PlanetId } from '../engine';
+import { currentIndex, type Action, type GameState, type Level, type PlanetId } from '../engine';
 
 const APP_ID = 'opengaz-v1';
 
@@ -34,8 +42,9 @@ interface MessageAction<T> {
 
 type Hello = { name: string };
 type Claim = { seat: number | null; name: string };
-type Act = { action: Action; week: number; turn: number; n: number };
-type Sync = { state: GameState; lobby: Lobby };
+/** `week`/`turn`/`rng` are the sender's state *after* applying `action` — our divergence check. */
+type Act = { action: Action; week: number; turn: number; rng: number; n: number };
+type Sync = { state: GameState; lobby: Lobby; seq: number };
 
 export type OnlineStatus = 'idle' | 'connecting' | 'lobby' | 'playing' | 'error';
 
@@ -55,10 +64,13 @@ class Online {
   myName = $state('');
   lobby = $state<Lobby | null>(null);
   peers = $state<Record<string, string>>({}); // peerId -> player name
-  /** sequence number of the last applied remote action */
+  /** number of actions applied so far this game — one global counter, same on every peer */
   seq = 0;
 
   private room: Room | null = null;
+  /** a snapshot has been asked for and not arrived yet (stops resync storms) */
+  private syncPending = false;
+  private syncTimer: ReturnType<typeof setTimeout> | null = null;
   private send: {
     hello?: (d: Hello) => Promise<void>;
     lobby?: (d: Lobby) => Promise<void>;
@@ -164,7 +176,7 @@ class Online {
       if (this.isHost && this.lobby) {
         if (this.status === 'playing') {
           const state = this.getState?.();
-          if (state) sync.send({ state, lobby: this.lobby }, { target: peerId });
+          if (state) sync.send({ state, lobby: this.lobby, seq: this.seq }, { target: peerId });
         } else lobby.send(this.lobby, { target: peerId });
       }
     };
@@ -199,12 +211,13 @@ class Online {
           this.broadcastLobby();
           if (this.status === 'playing') {
             const state = this.getState?.();
-            if (state) sync.send({ state, lobby: this.lobby }, { target: peerId });
+            if (state) sync.send({ state, lobby: this.lobby, seq: this.seq }, { target: peerId });
           }
         }
       }
     };
-    lobby.onMessage = (d) => {
+    lobby.onMessage = (d, { peerId }) => {
+      if (d.host !== peerId) return; // only the host owns the lobby
       this.lobby = d;
       if (this.status === 'connecting') this.status = 'lobby';
     };
@@ -219,30 +232,51 @@ class Online {
       }
       this.broadcastLobby();
     };
-    start.onMessage = (d) => {
+    start.onMessage = (d, { peerId }) => {
+      if (d.lobby.host !== peerId) return;
       this.lobby = d.lobby;
       this.status = 'playing';
-      this.seq = 0;
+      this.syncSettled();
+      this.seq = d.seq;
       this.onStart?.(d.state);
     };
-    sync.onMessage = (d) => {
+    sync.onMessage = (d, { peerId }) => {
+      if (d.lobby.host !== peerId) return;
       this.lobby = d.lobby;
       this.status = 'playing';
+      this.syncSettled();
+      // adopt the host's counter with its state, or every later action would look like a gap
+      this.seq = d.seq;
       this.onSync?.(d.state);
     };
-    act.onMessage = (d) => {
+    act.onMessage = (d, { peerId }) => {
       if (this.status !== 'playing') return;
+      const before = this.getState?.();
+      if (!before) return this.desync('an action arrived before we had a game state');
+      // only the peer holding the seat whose turn it is may move that company
+      const seat = this.lobby?.seats[currentIndex(before)];
+      if (!seat || seat.peer !== peerId) {
+        console.warn('[online] ignoring an action from a peer that does not hold the current seat');
+        return;
+      }
+      if (d.n !== this.seq + 1)
+        return this.desync(`action #${d.n} arrived with #${this.seq} applied`);
       this.seq = d.n;
       this.onRemoteAction?.(d.action);
+      // the rng word is a cheap whole-state fingerprint: it moves on every roll the engine makes
+      const after = this.getState?.();
+      if (!after || after.week !== d.week || after.turnIndex !== d.turn || after.rng !== d.rng)
+        this.desync('our engine ended up somewhere else than the acting peer');
     };
     syncReq.onMessage = (_d, { peerId }) => {
       if (!this.isHost || !this.lobby) return;
       const state = this.getState?.();
-      if (state) sync.send({ state, lobby: this.lobby }, { target: peerId });
+      if (state) sync.send({ state, lobby: this.lobby, seq: this.seq }, { target: peerId });
     };
   }
 
   leave(): void {
+    this.syncSettled();
     this.room?.leave();
     this.room = null;
     this.status = 'idle';
@@ -304,24 +338,63 @@ class Online {
     } else void this.send.claim?.({ seat: i, name: this.myName });
   }
 
+  /**
+   * Host, on start: drop the seats nobody took, and return the ones that are played.
+   *
+   * An unclaimed seat would still become a human company, and the turn order would stop dead on
+   * it the moment it came round — no browser owns it, so nobody can end its turn.
+   */
+  claimedSeats(): Seat[] {
+    if (!this.lobby) return [];
+    if (!this.isHost) return this.lobby.seats;
+    const claimed = this.lobby.seats.filter((s) => s.peer);
+    if (claimed.length !== this.lobby.seats.length) {
+      this.lobby.seats = claimed;
+      this.broadcastLobby();
+    }
+    return this.lobby.seats;
+  }
+
   /** host: start the game with the given initial state and tell everyone */
   startGame(state: GameState): void {
     if (!this.isHost || !this.lobby) return;
     this.status = 'playing';
     this.seq = 0;
-    void this.send.start?.({ state, lobby: this.lobby });
+    void this.send.start?.({ state, lobby: this.lobby, seq: 0 });
   }
 
   /* -------------------------------------------------------------- play */
 
+  /** `state` is the state *after* `a` was applied here — the peers check theirs against it. */
   broadcastAction(a: Action, state: GameState): void {
     if (this.status !== 'playing') return;
     this.seq++;
-    void this.send.act?.({ action: a, week: state.week, turn: state.turnIndex, n: this.seq });
+    void this.send.act?.({
+      action: a,
+      week: state.week,
+      turn: state.turnIndex,
+      rng: state.rng,
+      n: this.seq,
+    });
+  }
+
+  /** we cannot trust our own state any more: say why, and get a fresh one from the host */
+  private desync(why: string): void {
+    console.warn(`[online] out of step — ${why}; asking the host for a snapshot`);
+    this.requestSync();
+  }
+
+  private syncSettled(): void {
+    this.syncPending = false;
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.syncTimer = null;
   }
 
   requestSync(): void {
-    if (!this.lobby) return;
+    if (!this.lobby || this.syncPending) return;
+    this.syncPending = true;
+    // a snapshot can go missing (host gone, message lost); let the next attempt through
+    this.syncTimer = setTimeout(() => this.syncSettled(), 5000);
     void this.send.syncReq?.({ name: this.myName }, { target: this.lobby.host });
   }
 
