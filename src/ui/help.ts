@@ -78,6 +78,10 @@ export const HELP: Partial<Record<Screen, { title: string; text: string }>> = {
     title: 'Shortcuts',
     text: 'Each shortcut turns a button into the action itself: the Crew button pays the wages, the fuel pump fills the tank, a click in the Marketplace buys or sells on the spot. With them on you can play a whole turn without opening a screen. Right-clicking any shortcut control still opens the full screen, so nothing is ever out of reach. Shortcuts are remembered per company in this browser and never change the rules — they dispatch exactly what the long way round would.',
   },
+  tutorial: {
+    title: 'Tutorial',
+    text: 'At the Tutorial level the game starts with almost nothing switched on and hands you one more thing to worry about every few weeks — and the rules behind a feature stay off until then, so nothing charges you for a system you have not met. The first seven arrive on their own; after that a solo player presses Add New Feature whenever they are ready, and a shared game gets one a week. Reaching the last one ends the tutorial for good.',
+  },
   file: {
     title: 'File Options',
     text: 'Save up to five games in this browser; the game also autosaves. "Copy game link" packs the whole game into a link you can send to the next player — the modern play-by-email.',

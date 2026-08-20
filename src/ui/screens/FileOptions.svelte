@@ -2,6 +2,7 @@
   import Btn from '../components/Btn.svelte';
   import SoundToggle from '../components/SoundToggle.svelte';
   import { game } from '../game.svelte';
+  import { unlocked } from '../../engine';
   import { online } from '../../net/online.svelte';
   let link = $state('');
   let copied = $state(false);
@@ -64,7 +65,9 @@
   <div class="buttons">
     <SoundToggle />
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
-    <Btn color="green" onclick={() => game.go('shortcuts')}>Shortcuts</Btn>
+    {#if unlocked(game.s, 'stock')}
+      <Btn color="green" onclick={() => game.go('shortcuts')}>Shortcuts</Btn>
+    {/if}
     <Btn
       onclick={() => {
         online.leave();

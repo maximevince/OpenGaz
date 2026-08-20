@@ -8,6 +8,7 @@
   import Setup from './ui/screens/Setup.svelte';
   import Handoff from './ui/screens/Handoff.svelte';
   import Report from './ui/screens/Report.svelte';
+  import Tutorial from './ui/screens/Tutorial.svelte';
   import MainMenu from './ui/screens/MainMenu.svelte';
   import Marketplace from './ui/screens/Marketplace.svelte';
   import Supply from './ui/screens/Supply.svelte';
@@ -49,6 +50,7 @@
     setup: Setup,
     handoff: Handoff,
     report: Report,
+    tutorial: Tutorial,
     menu: MainMenu,
     market: Marketplace,
     supply: Supply,
@@ -89,7 +91,7 @@
   {:else if Current}
     <Current />
   {/if}
-  {#if game.state?.pending && game.state.phase !== 'event' && game.screen !== 'event' && game.screen !== 'title' && game.screen !== 'report'}
+  {#if game.state?.pending && game.state.phase !== 'event' && game.screen !== 'event' && game.screen !== 'title' && game.screen !== 'report' && game.screen !== 'tutorial'}
     <Event />
   {/if}
   <HelpDialog />

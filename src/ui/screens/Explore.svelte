@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PLANET_BY_ID, newsHeadline, weatherForecast } from '../../engine';
+  import { PLANET_BY_ID, newsHeadline, unlocked, weatherForecast } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import Portrait from '../components/Portrait.svelte';
   import { game } from '../game.svelte';
@@ -8,7 +8,12 @@
   const p = $derived(game.planet);
   const def = $derived(PLANET_BY_ID[p.id]);
   type Tab = 'special' | 'weather' | 'news' | 'time' | 'history';
+  /** before the city is fully open there is no special, no news and no weather to read */
+  const full = $derived(unlocked(s, 'explore'));
   let tab = $state<Tab>('special');
+  $effect(() => {
+    if (!full && (tab === 'special' || tab === 'news' || tab === 'weather')) tab = 'time';
+  });
   const headline = $derived(newsHeadline(s));
   const olderNews = $derived(
     s.log
@@ -91,9 +96,11 @@
   </div>
   <div class="buttons">
     <Btn color="blue" onclick={() => game.go('menu')}>Continue</Btn>
-    <Btn color="blue" onclick={() => (tab = 'special')}>Planet Special</Btn>
-    <Btn color="blue" onclick={() => (tab = 'weather')}>Weather Bureau</Btn>
-    <Btn color="blue" onclick={() => (tab = 'news')}>News Center</Btn>
+    {#if full}
+      <Btn color="blue" onclick={() => (tab = 'special')}>Planet Special</Btn>
+      <Btn color="blue" onclick={() => (tab = 'weather')}>Weather Bureau</Btn>
+      <Btn color="blue" onclick={() => (tab = 'news')}>News Center</Btn>
+    {/if}
     <Btn color="blue" onclick={() => (tab = 'time')}>Ministry of Time</Btn>
     <Btn color="blue" onclick={() => (tab = 'history')}>History</Btn>
     <Btn color="blue" onclick={() => game.help('explore')}>Help</Btn>

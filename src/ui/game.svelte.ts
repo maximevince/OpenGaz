@@ -24,6 +24,7 @@ export type Screen =
   | 'setup'
   | 'handoff'
   | 'report'
+  | 'tutorial'
   | 'menu'
   | 'market'
   | 'supply'
@@ -209,6 +210,13 @@ class GameStore {
       this.autosave();
       return;
     }
+    // the week's lesson is owed before this player may act
+    if (s.tutorPending && s.phase === 'onPlanet') {
+      this.shownCompany = currentIndex(s);
+      this.screen = 'tutorial';
+      this.autosave();
+      return;
+    }
     if (s.phase === 'event') {
       if (this.screen !== 'event') play(`event.${s.pending?.mood ?? 'neutral'}`);
       this.screen = 'event';
@@ -246,6 +254,7 @@ class GameStore {
           'setup',
           'lobby',
           'waiting',
+          'tutorial',
         ].includes(this.screen)
       ) {
         this.screen = 'menu';

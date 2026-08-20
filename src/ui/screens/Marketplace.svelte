@@ -5,6 +5,7 @@
     cargoTons,
     levelOf,
     priceRange,
+    unlocked,
     type CommodityId,
   } from '../../engine';
   import Btn from '../components/Btn.svelte';
@@ -122,8 +123,12 @@
   </div>
   <div class="buttons">
     <Btn color="green" onclick={() => game.go('menu')}>Continue</Btn>
-    <Btn color="green" onclick={() => game.go('supply')}>Supply %</Btn>
-    <Btn color="green" onclick={() => game.go('warehouse')}>Warehouse</Btn>
+    {#if unlocked(game.s, 'supply')}
+      <Btn color="green" onclick={() => game.go('supply')}>Supply %</Btn>
+    {/if}
+    {#if unlocked(game.s, 'warehouse')}
+      <Btn color="green" onclick={() => game.go('warehouse')}>Warehouse</Btn>
+    {/if}
     <Btn color="green" onclick={() => game.help()}>Help</Btn>
   </div>
 
