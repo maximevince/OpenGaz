@@ -29,6 +29,9 @@
       }}
       disabled={!game.state}>File Options</Btn
     >
+    {#if import.meta.env.DEV}
+      <Btn onclick={() => game.go('soundtest')}>Sound test</Btn>
+    {/if}
   </div>
   <div class="pack"><SoundToggle /> OpenGaz {BUILD} · asset pack: {pack}</div>
 </div>

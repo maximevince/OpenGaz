@@ -68,6 +68,9 @@
     {#if unlocked(game.s, 'stock')}
       <Btn color="green" onclick={() => game.go('shortcuts')}>Shortcuts</Btn>
     {/if}
+    {#if import.meta.env.DEV}
+      <Btn onclick={() => game.go('soundtest')}>Sound test</Btn>
+    {/if}
     <Btn
       onclick={() => {
         online.leave();

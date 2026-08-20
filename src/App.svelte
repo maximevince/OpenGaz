@@ -34,6 +34,7 @@
   import GameOver from './ui/screens/GameOver.svelte';
   import Lobby from './ui/screens/Lobby.svelte';
   import Waiting from './ui/screens/Waiting.svelte';
+  import SoundTest from './ui/screens/SoundTest.svelte';
 
   let ready = $state(false);
   // ?pack=opengaz forces the shipped pack even when the dev-only original pack is present
@@ -77,6 +78,7 @@
     gameover: GameOver,
     lobby: Lobby,
     waiting: Waiting,
+    soundtest: SoundTest,
   } as const;
   const Current = $derived(
     game.screen === 'title' ? null : (screens[game.screen as keyof typeof screens] ?? null),
@@ -86,7 +88,7 @@
 <Stage>
   {#if !ready}
     <div class="loading">Loading…</div>
-  {:else if game.screen === 'title' || (!game.state && game.screen !== 'setup' && game.screen !== 'lobby')}
+  {:else if game.screen === 'title' || (!game.state && game.screen !== 'setup' && game.screen !== 'lobby' && game.screen !== 'soundtest')}
     <Title />
   {:else if Current}
     <Current />
