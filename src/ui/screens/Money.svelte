@@ -91,9 +91,8 @@
         <Plate label="Company Status:" value={status} color="yellow" />
         <Plate label="Goal:" value={`${fmt(target)} net worth`} color="yellow" />
         <div class="breakdown">
-          cash {fmt(co.cash)} + bank {fmt(co.bank)} + shares {fmt(sharesValue(s, co))} + goods at cost {fmt(
-            cargoAtCost(co),
-          )} − Union {fmt(co.unionLoan)} − Zinn {fmt(co.zinnLoan)}
+          cash {fmt(co.cash)} + bank {fmt(co.bank)} + shares {fmt(sharesValue(s, co))} + goods at cost
+          {fmt(cargoAtCost(co))} − Union {fmt(co.unionLoan)} − Zinn {fmt(co.zinnLoan)}
         </div>
       </div>
       <div class="coins">🪙</div>

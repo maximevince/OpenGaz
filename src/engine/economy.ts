@@ -138,9 +138,7 @@ export function netWorth(state: GameState, co: CompanyState): number {
   if (co.bankrupt) return -10_000_000_000;
   const shares = sharesValue(state, co);
   if (co.isAI) return Math.floor(shares + co.cash);
-  return Math.floor(
-    shares + co.cash + co.bank + cargoAtCost(co) - co.unionLoan - co.zinnLoan,
-  );
+  return Math.floor(shares + co.cash + co.bank + cargoAtCost(co) - co.unionLoan - co.zinnLoan);
 }
 
 /**
