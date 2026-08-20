@@ -135,12 +135,27 @@ Three layers, cheapest first; the UI calls `sfx('<id>')` and gets whatever the p
 3. **Music** — either our own ZzFXM/OPL-style chiptunes, or CC0/CC-BY tracks (OpenGameArt
    CC0 space/lounge loops; Kevin MacLeod tracks are CC-BY 4.0 → keep credit line).
 
-Sound id taxonomy (mirrors where the game needs feedback):
-`sfx.click`, `sfx.buy`, `sfx.sell`, `sfx.coins`, `sfx.cash` (big payout), `sfx.error`,
-`sfx.rocket.1..3` (launch), `sfx.engine`, `sfx.arrive`, `sfx.event.good|neutral|bad`,
-`sfx.stock.up|down|crash`, `sfx.auction`, `sfx.bank`, `sfx.loan`, `sfx.tax`, `sfx.crew`,
-`sfx.insure`, `sfx.fuel`, `sfx.warehouse`, `sfx.news`, `sfx.weather`, `sfx.help`,
-`sfx.win`, `sfx.lose`, `sfx.bankrupt`, `sfx.dred`, `sfx.zinn`; `music.title|travel|win|lose`.
+Sound id taxonomy — the 61 ids the game actually plays, all currently synthesised. Dropping
+`<id>.wav` into `assets/src/sfx/` and rebuilding makes the sample win over the synth, one id at
+a time; nothing else has to change.
+
+- interface: `click`, `help`, `ping` (a choice on a picker), `select` (a ship), `error`,
+  `unlock` (a tutorial feature arrives)
+- money: `buy`, `sell`, `coins`, `cash` (big payout), `gooddeal`, `baddeal`
+- services, played both when the screen opens and on the action: `market`, `warehouse`,
+  `pickup`, `advert`, `crew`, `tax`, `insure`, `stock`, `stock2` (selling), `money`, `bank`,
+  `bank2` (withdrawing), `loan`, `zinn`, `fuel`, `map`, `special`
+- explore: `news`, `weather`, `clock`, `history`
+- travel and events: `rocket`, `arrive`, `event.good|neutral|bad`, `stock.crash`, `auction`
+- endings: `win`, `lose`, `bankrupt`
+- one per commodity: `commodity.<id>`, e.g. `commodity.gems` (18)
+
+Which sound belongs where is `src/ui/soundmap.ts`; what it sounds like is `src/ui/sound.ts`.
+Music ids (`music.*`) are not wired yet.
+
+**Sound test screen**: run `pnpm dev` and use the _Sound test_ button on the title screen or in
+File Options — every id with a play button, marked by whether it is coming from a sample or the
+synth. That is the fastest way to audition a candidate pack.
 
 Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WAV masters in
 `assets/src/sfx/`.
@@ -153,4 +168,8 @@ Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WA
 3. Create art-direction briefs for planets, ships, portraits, and screens.
 4. Create: title + 14 planet larges + 12 ships first (most visible), then portraits, then
    surfaces/icons; iterate style until coherent; commit masters + built output + SOURCES rows.
-5. CC0 sfx pass; optional music.
+5. Wire every id above to where it is played, synth-only — done.
+6. CC0 sfx pass: replace the synth with samples, id by id, recording each source in SOURCES.md.
+7. Music: a `music/` master tree with its own encode spec (stereo, 44.1 kHz), a looping channel
+   separate from the effects channel, and a three-way sound setting (off / effects / everything).
+   Public-domain scores rendered by us, so the recording is ours to license.
