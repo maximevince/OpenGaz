@@ -35,9 +35,14 @@
   }
   .frame {
     flex: 1;
+    min-height: 0;
     background: #fff;
-    display: grid;
-    place-items: center;
+    /* flex, not grid: `max-height: 100%` on a grid item resolves against the auto-sized
+       row (its own content) and is dropped, which cropped every portrait instead of
+       letterboxing it */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
   }
   img {

@@ -333,11 +333,20 @@
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
-    display: grid;
-    place-items: center;
+    /* flex, not grid: a percentage max-height on a grid item resolves against the
+       auto-sized row (i.e. against its own content) and is silently ignored */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    box-sizing: border-box;
   }
   .dlg {
     width: 600px;
+    /* never taller than the stage: the ship grid scrolls instead of pushing the
+       action row off the bottom */
+    max-height: 100%;
+    box-sizing: border-box;
     background: var(--c-face);
     border: 2px solid;
     border-color: #fff #404040 #404040 #fff;
@@ -348,6 +357,7 @@
     gap: 8px;
   }
   .dlg-title {
+    flex: none;
     background: var(--c-navy);
     color: #fff;
     font: bold 13px var(--font-ui);
@@ -358,6 +368,8 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 4px;
+    overflow: auto;
+    min-height: 0;
   }
   .sh {
     color: #000;
@@ -380,6 +392,7 @@
   }
   .dealer-preview {
     height: 100px;
+    flex: none;
     display: grid;
     grid-template-columns: 170px 1fr;
     align-items: center;
@@ -406,6 +419,7 @@
     font-size: 11px;
   }
   .ship-actions {
+    flex: none;
     display: flex;
     gap: 6px;
   }
