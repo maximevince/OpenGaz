@@ -23,7 +23,8 @@
     "assets:build": "node scripts/build-assets.mjs",
     "assets:check": "node scripts/build-assets.mjs --check",
     "assets:original": "bash scripts/import-original-assets.sh",
-    "guard:no-original-assets": "bash scripts/guard-no-original-assets.sh"
+    "guard:no-original-assets": "bash scripts/guard-no-original-assets.sh",
+    "guard:no-debug": "bash scripts/guard-no-debug.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

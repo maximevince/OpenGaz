@@ -33,3 +33,5 @@ jobs:
           fi
           pnpm test:layout
       - run: pnpm build
+      - name: Guard — no dev inspector in the production bundle
+        run: pnpm guard:no-debug
