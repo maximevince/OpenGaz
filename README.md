@@ -62,6 +62,30 @@ pnpm build        # static site in dist/
 pnpm assets:build # assets/src masters -> public/assets pack (see docs/ASSETS.md)
 ```
 
+### The inspector (dev only)
+
+`pnpm dev` docks a state inspector beside the stage; **F9** (or `Ctrl`+`` ` ``) opens and closes it,
+and it remembers where it was. It reads the live `GameState`: the week's scalars and world rolls,
+every company and planet, the whole 18 × 7 market shaded against each commodity's price band, the
+travel-event and auction bookkeeping, the log, and the state's size as JSON and as a play-by-link
+URL. Any dotted path (`companies[0].cash`) can be pinned as a watch with a sparkline — clicking a
+row in the raw tree pins it for you.
+
+Two tabs go further:
+
+- **trace** keeps the last fifty states the game passed through. The engine is pure, so each one
+  is a real point in time: the tab shows which leaves the action moved, and _restore_ puts the game
+  back there and plays on.
+- **cheats** writes straight into the state — cash, debts, the tutorial ladder, any path at all.
+  From the first such edit the panel brands the game **hand-edited**, because its behaviour is no
+  longer evidence about the engine. Nothing is broadcast, so cheating inside an online room
+  desyncs it.
+
+None of it ships. `src/main.ts` reaches the panel only through a dynamic import behind
+`import.meta.env.DEV`, which Vite turns into a literal `false` for a build, so Rollup drops the
+whole directory; `pnpm guard:no-debug` greps `dist/` for its marker and fails the build (in CI and
+in the Pages deploy) if that ever stops being true.
+
 ### The 640×480 stage
 
 Every screen is drawn on a fixed 640×480 stage that is scaled to the window and **clips
