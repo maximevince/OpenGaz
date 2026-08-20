@@ -16,12 +16,14 @@
   const co = $derived(game.co);
   let hover: number | null = $state(null);
   let confirm: number | null = $state(null);
-  // slot grid units -> pixels inside a 640x420 field
+  // slot grid units -> pixels on the 640x480 stage. The field stops short of the info
+  // strip: a planet button is ~74px tall and centred on the point, and the strip grows to
+  // three lines with both quick shortcuts on, so the bottom row used to sit under it.
   const pos = (slot: number) => {
     const g = MAP_SLOTS[slot]!;
     // the button is 90px wide and centred on the point, so keep it half a button clear
     // of the left edge — the leftmost column used to hang 5px outside the map
-    return { x: Math.max(46, 40 + (g.x / 21) * 540), y: 40 + (g.y / 13) * 330 };
+    return { x: Math.max(46, 40 + (g.x / 21) * 540), y: 40 + (g.y / 13) * 290 };
   };
   const stars = img('bg.stars.1');
   const worst = (to: number) => {
