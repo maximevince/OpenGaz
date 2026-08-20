@@ -19,7 +19,9 @@
   // slot grid units -> pixels inside a 640x420 field
   const pos = (slot: number) => {
     const g = MAP_SLOTS[slot]!;
-    return { x: 40 + (g.x / 21) * 540, y: 40 + (g.y / 13) * 330 };
+    // the button is 90px wide and centred on the point, so keep it half a button clear
+    // of the left edge — the leftmost column used to hang 5px outside the map
+    return { x: Math.max(46, 40 + (g.x / 21) * 540), y: 40 + (g.y / 13) * 330 };
   };
   const stars = img('bg.stars.1');
   const worst = (to: number) => {
