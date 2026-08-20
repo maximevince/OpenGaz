@@ -4,7 +4,9 @@
   import Btn from '../components/Btn.svelte';
   import SoundToggle from '../components/SoundToggle.svelte';
   import { fmt } from '../format';
-  import { game } from '../game.svelte';
+  import { game, type Screen } from '../game.svelte';
+  import { runQuick } from '../quick';
+  import { shortcuts, type QuickFlag } from '../shortcuts.svelte';
 
   const co = $derived(game.co);
   const p = $derived(game.planet);
@@ -13,6 +15,12 @@
   const fuelCost = $derived((co.ship.fuelCap - co.ship.fuel) * p.fuelPrice);
   const fuelPct = $derived(co.ship.fuel / co.ship.fuelCap);
   const taxes = $derived(co.taxOwedPassenger + co.taxOwedTariff);
+
+  /** With the shortcut on, act right here; right-click always opens the full screen anyway. */
+  const act = (flag: QuickFlag, screen: Screen) =>
+    shortcuts.on(co.id, flag) ? runQuick(flag) : game.go(screen);
+  /** the little mark that says "this button acts instead of opening a screen" */
+  const bolt = (flag: QuickFlag) => (shortcuts.on(co.id, flag) ? ' ⚡' : '');
 </script>
 
 <div class="menu">
@@ -24,8 +32,12 @@
     </div>
     <Btn color="blue" onclick={() => game.go('stock')}>Stock Market</Btn>
     <Btn color="blue" onclick={() => game.go('money')}>Money: {fmt(co.cash)} cash</Btn>
-    <Btn color="blue" onclick={() => game.go('bank')}>Bank: {fmt(co.bank)}</Btn>
-    <Btn color="blue" onclick={() => game.go('loan')}>Loan: {fmt(co.unionLoan)}</Btn>
+    <Btn color="blue" onclick={() => act('bank', 'bank')} oncontextmenu={() => game.go('bank')}
+      >Bank: {fmt(co.bank)}{bolt('bank')}</Btn
+    >
+    <Btn color="blue" onclick={() => act('loan', 'loan')} oncontextmenu={() => game.go('loan')}
+      >Loan: {fmt(co.unionLoan)}{bolt('loan')}</Btn
+    >
     <Btn color="blue" onclick={() => game.go('zinn')}>Zinn's Loan: {fmt(co.zinnLoan)}</Btn>
   </div>
 
@@ -41,25 +53,55 @@
         ><span class="big">🏭</span>Warehouse</Btn
       >
     </div>
-    <Btn color="green" onclick={() => game.go('passengers')}>
-      Pickup Passengers: {co.paxPickedUp ? `${co.passengers} aboard` : co.paxWaiting}
+    <Btn
+      color="green"
+      onclick={() => act('passengers', 'passengers')}
+      oncontextmenu={() => game.go('passengers')}
+    >
+      Pickup Passengers: {co.paxPickedUp ? `${co.passengers} aboard` : co.paxWaiting}{bolt(
+        'passengers',
+      )}
     </Btn>
-    <Btn color="green" onclick={() => game.go('advertise')}>Advertise for Next Planet</Btn>
-    <Btn color="green" onclick={() => game.go('crew')}>
-      Crew Wages Owed: {fmt(co.wagesOwed)}
+    <Btn
+      color="green"
+      onclick={() => act('advertising', 'advertise')}
+      oncontextmenu={() => game.go('advertise')}>Advertise for Next Planet{bolt('advertising')}</Btn
+    >
+    <Btn color="green" onclick={() => act('crew', 'crew')} oncontextmenu={() => game.go('crew')}>
+      Crew Wages Owed: {fmt(co.wagesOwed)}{bolt('crew')}
     </Btn>
-    <Btn color="green" onclick={() => game.go('taxes')}>Taxes Owed: {fmt(taxes)}</Btn>
-    <Btn color="green" onclick={() => game.go('insurance')}>
-      Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insuranceCost)}
+    <Btn color="green" onclick={() => act('tax', 'taxes')} oncontextmenu={() => game.go('taxes')}
+      >Taxes Owed: {fmt(taxes)}{bolt('tax')}</Btn
+    >
+    <Btn
+      color="green"
+      onclick={() => act('insurance', 'insurance')}
+      oncontextmenu={() => game.go('insurance')}
+    >
+      Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insuranceCost)}{bolt('insurance')}
     </Btn>
-    <Btn color="green" onclick={() => game.go('explore')}>Explore Planet</Btn>
+    <Btn
+      color="green"
+      onclick={() => act('explore', 'explore')}
+      oncontextmenu={() => game.go('explore')}>Explore Planet{bolt('explore')}</Btn
+    >
     <Btn color="green" onclick={() => game.go('file')}>File Options</Btn>
   </div>
 
   <!-- right column -->
   <div class="right">
     <div class="fuelcost">Fuel Cost: {fmt(fuelCost)}</div>
-    <button class="pump" onclick={() => game.go('fuel')} title="Fuel">⛽</button>
+    <button
+      class="pump"
+      onclick={() => act('fuel', 'fuel')}
+      oncontextmenu={(e) => {
+        e.preventDefault();
+        game.go('fuel');
+      }}
+      title={shortcuts.on(co.id, 'fuel')
+        ? 'Fuel — click to fill the tank, right-click for the screen'
+        : 'Fuel'}>⛽{shortcuts.on(co.id, 'fuel') ? '⚡' : ''}</button
+    >
     <div class="gauge" title="Fuel tank">
       <div class="fill" style:height={`${Math.round(fuelPct * 100)}%`}></div>
       <span class="gauge-label">Fuel Tank</span>

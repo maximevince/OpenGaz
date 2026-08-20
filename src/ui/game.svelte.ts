@@ -41,6 +41,7 @@ export type Screen =
   | 'zinn'
   | 'fuel'
   | 'file'
+  | 'shortcuts'
   | 'map'
   | 'charts'
   | 'travel'

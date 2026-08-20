@@ -74,6 +74,10 @@ export const HELP: Partial<Record<Screen, { title: string; text: string }>> = {
     title: 'Explore Planet',
     text: 'Every planet has a Special institution worth a visit — banking favours, insurance reviews, upgrades, blessings, casinos and smugglers. The Weather Bureau warns of hazards, the News Center reports what moves the markets, and the Histories tell you how Kukubia got this way.',
   },
+  shortcuts: {
+    title: 'Shortcuts',
+    text: 'Each shortcut turns a button into the action itself: the Crew button pays the wages, the fuel pump fills the tank, a click in the Marketplace buys or sells on the spot. With them on you can play a whole turn without opening a screen. Right-clicking any shortcut control still opens the full screen, so nothing is ever out of reach. Shortcuts are remembered per company in this browser and never change the rules — they dispatch exactly what the long way round would.',
+  },
   file: {
     title: 'File Options',
     text: 'Save up to five games in this browser; the game also autosaves. "Copy game link" packs the whole game into a link you can send to the next player — the modern play-by-email.',

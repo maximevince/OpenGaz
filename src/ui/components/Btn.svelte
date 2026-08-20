@@ -4,6 +4,7 @@
   let {
     children,
     onclick,
+    oncontextmenu,
     color = 'face',
     disabled = false,
     style = '',
@@ -11,6 +12,8 @@
   }: {
     children: Snippet;
     onclick?: () => void;
+    /** right-click. Used by shortcuts to reach the full screen without turning the shortcut off. */
+    oncontextmenu?: () => void;
     color?: 'face' | 'green' | 'blue' | 'cyan' | 'black' | 'yellow' | 'red';
     disabled?: boolean;
     style?: string;
@@ -24,6 +27,11 @@
     play('click');
     onclick?.();
   }}
+  oncontextmenu={oncontextmenu &&
+    ((e) => {
+      e.preventDefault();
+      oncontextmenu();
+    })}
   {disabled}
   {style}
   {title}
