@@ -64,6 +64,7 @@
   <div class="buttons">
     <SoundToggle />
     <Btn onclick={() => game.go('menu')}>Continue</Btn>
+    <Btn color="green" onclick={() => game.go('shortcuts')}>Shortcuts</Btn>
     <Btn
       onclick={() => {
         online.leave();

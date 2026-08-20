@@ -11,6 +11,7 @@
   import Prompt from '../components/Prompt.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { shortcuts } from '../shortcuts.svelte';
   const co = $derived(game.co);
   const pi = $derived(co.planet);
   const pname = $derived(PLANET_BY_ID[game.planet.id].name);
@@ -18,6 +19,26 @@
   const used = $derived(warehouseTons(co, pi));
   const cap = $derived(co.warehouseSpace);
   let prompt: { mode: 'store' | 'retrieve'; c: CommodityId; max: number } | null = $state(null);
+  const quick = $derived(shortcuts.on(co.id, 'warehouse'));
+
+  /** Quick Warehouse: one click moves the goods, loading in preference to storing. */
+  function quickMove(c: CommodityId) {
+    const stored = wh[c]?.tons ?? 0;
+    const onShip = co.cargo[c]?.tons ?? 0;
+    const holdRoom = co.ship.cargo - cargoTons(co);
+    if (stored > 0 && holdRoom > 0) {
+      game.dispatch({ type: 'retrieve', commodity: c, tons: Math.min(stored, holdRoom) });
+      return;
+    }
+    if (onShip > 0 && cap - used > 0) {
+      game.dispatch({ type: 'store', commodity: c, tons: Math.min(onShip, cap - used) });
+      return;
+    }
+    game.error =
+      stored === 0 && onShip === 0
+        ? 'Nothing here to load or store.'
+        : 'No room to move it either way.';
+  }
 </script>
 
 <div class="wh">
@@ -27,8 +48,14 @@
     <Plate label="Cargo bay:" value={`${cargoTons(co)} / ${co.ship.cargo} tons`} />
   </div>
   <div class="hint">
-    Goods in a warehouse pay no tariffs and wait for a better price. Extra space is offered by the
-    Trader's Union lottery.
+    <span>
+      {quick
+        ? 'Quick Warehouse: a click loads what is stored, or stores what you carry.'
+        : "Goods in a warehouse pay no tariffs and wait for a better price. Extra space is offered by the Trader's Union lottery."}
+    </span>
+    <button class="quick" class:on={quick} onclick={() => shortcuts.toggle(co.id, 'warehouse')}>
+      Quick Warehouse {quick ? 'ON' : 'OFF'}
+    </button>
   </div>
   <div class="grid">
     <table>
@@ -42,7 +69,11 @@
         {#each game.s.commodities as c (c)}
           {@const onShip = co.cargo[c]?.tons ?? 0}
           {@const stored = wh[c]?.tons ?? 0}
-          <tr>
+          <tr
+            class:clickable={quick}
+            onclick={() => quick && quickMove(c)}
+            oncontextmenu={(e) => e.preventDefault()}
+          >
             <td class="name">{COMMODITY_BY_ID[c].name}</td>
             <td>{onShip}</td>
             <td>{stored}</td>
@@ -50,7 +81,7 @@
             <td
               ><Btn
                 color="green"
-                disabled={onShip === 0 || used >= cap}
+                disabled={quick || onShip === 0 || used >= cap}
                 onclick={() => (prompt = { mode: 'store', c, max: Math.min(onShip, cap - used) })}
                 >Store ▶</Btn
               ></td
@@ -58,7 +89,7 @@
             <td
               ><Btn
                 color="green"
-                disabled={stored === 0 || cargoTons(co) >= co.ship.cargo}
+                disabled={quick || stored === 0 || cargoTons(co) >= co.ship.cargo}
                 onclick={() =>
                   (prompt = {
                     mode: 'retrieve',
@@ -126,6 +157,32 @@
   }
   .hint {
     font: 10px/1.2 var(--font-ui);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .hint span {
+    flex: 1;
+  }
+  .quick {
+    font: bold 10px var(--font-ui);
+    padding: 1px 6px;
+    border: 2px solid;
+    border-color: #fff #404040 #404040 #fff;
+    background: var(--c-face);
+    color: #000;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .quick.on {
+    background: var(--c-yellow-plate);
+    border-color: #404040 #fff #fff #404040;
+  }
+  tbody tr.clickable {
+    cursor: pointer;
+  }
+  tbody tr.clickable:hover td {
+    background: #c0ffc0;
   }
   /* elastic, scrolling block — keeps the button row on screen */
   .grid {

@@ -4,6 +4,7 @@
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { shortcuts } from '../shortcuts.svelte';
   const s = $derived(game.s);
   const co = $derived(game.co);
   let hover: number | null = $state(null);
@@ -18,6 +19,18 @@
     const d = distanceBetween(s, co.planet, to);
     return Math.floor(d / 2) + Math.floor(co.ship.tons / 100);
   };
+
+  /**
+   * Leave for `to`. Quick Deposit banks the cash first, so it earns interest in flight; the
+   * deposit is a normal action, so it is logged and replayed like any other.
+   */
+  function depart(to: number) {
+    confirm = null;
+    if (shortcuts.on(co.id, 'deposit') && co.cash > 0) {
+      game.dispatch({ type: 'bankDeposit', amount: co.cash });
+    }
+    game.dispatch({ type: 'journey', to });
+  }
 </script>
 
 <div class="map" style:background-image={stars ? `url(${stars})` : undefined}>
@@ -32,7 +45,11 @@
       style:top={`${pt.y}px`}
       onmouseenter={() => (hover = i)}
       onmouseleave={() => (hover = null)}
-      onclick={() => !here && (confirm = i)}
+      onclick={() => !here && (shortcuts.on(co.id, 'travel') ? depart(i) : (confirm = i))}
+      oncontextmenu={(e) => {
+        e.preventDefault();
+        if (!here) confirm = i;
+      }}
       title={PLANET_BY_ID[p.id].name}
     >
       {#if icon}<img src={icon} alt="" />{:else}<span class="ball"></span>{/if}
@@ -50,6 +67,9 @@
       )} days · up to {worst(hover)} t fuel (tank {co.ship.fuel} t)
     {:else}
       You are on {PLANET_BY_ID[game.planet.id].name}. Click a planet to travel there. Week {s.week}.
+      {#if shortcuts.on(co.id, 'travel')}⚡ Quick Travel: a click launches at once (right-click to
+        see the trip first).{/if}
+      {#if shortcuts.on(co.id, 'deposit')}⚡ Quick Deposit: your cash goes to the bank as you leave.{/if}
     {/if}
   </div>
   <div class="buttons">
@@ -81,14 +101,7 @@
           {#if !co.insured}<p class="w">You are not insured for this trip.</p>{/if}
           {#if co.passengers === 0}<p class="w">No passengers aboard.</p>{/if}
           <div class="row">
-            <Btn
-              color="green"
-              onclick={() => {
-                const to = confirm!;
-                confirm = null;
-                game.dispatch({ type: 'journey', to });
-              }}>Blast off!</Btn
-            >
+            <Btn color="green" onclick={() => depart(confirm!)}>Blast off!</Btn>
             <Btn onclick={() => (confirm = null)}>Stay</Btn>
           </div>
         </div>

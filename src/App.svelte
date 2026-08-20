@@ -25,6 +25,7 @@
   import Zinn from './ui/screens/Zinn.svelte';
   import Fuel from './ui/screens/Fuel.svelte';
   import FileOptions from './ui/screens/FileOptions.svelte';
+  import Shortcuts from './ui/screens/Shortcuts.svelte';
   import Map from './ui/screens/Map.svelte';
   import Charts from './ui/screens/Charts.svelte';
   import Event from './ui/screens/Event.svelte';
@@ -65,6 +66,7 @@
     zinn: Zinn,
     fuel: Fuel,
     file: FileOptions,
+    shortcuts: Shortcuts,
     map: Map,
     charts: Charts,
     travel: Arrival,

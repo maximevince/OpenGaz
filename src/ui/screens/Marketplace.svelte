@@ -10,6 +10,7 @@
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { shortcuts } from '../shortcuts.svelte';
 
   const co = $derived(game.co);
   const p = $derived(game.planet);
@@ -31,6 +32,27 @@
       ),
     );
   const maxSell = (c: CommodityId) => co.cargo[c]?.tons ?? 0;
+
+  const quick = $derived(shortcuts.on(co.id, 'buy'));
+
+  /** Quick Buy: one click trades. Sell the lot if you hold it, otherwise buy all you can. */
+  function quickTrade(c: CommodityId) {
+    const held = maxSell(c);
+    if (held > 0) {
+      game.dispatch({ type: 'sell', commodity: c, tons: held });
+      return;
+    }
+    if (tons >= co.ship.cargo) {
+      game.error = 'Your hold is full.';
+      return;
+    }
+    const n = maxBuy(c);
+    if (n <= 0) {
+      game.error = (p.stock[c] ?? 0) === 0 ? 'None for sale here.' : 'Not enough cash for a ton.';
+      return;
+    }
+    game.dispatch({ type: 'buy', commodity: c, tons: n });
+  }
 
   function open(c: CommodityId) {
     sel = c;
@@ -55,7 +77,14 @@
     <div class="plate green">Cash: {fmt(co.cash)}</div>
     <div class="plate green">Profit: {fmt(co.visitProfit)}</div>
   </div>
-  <div class="hint">Click on the commodity you wish to buy or sell.</div>
+  <div class="hint">
+    {quick
+      ? 'Quick Buy: a click sells what you carry, or buys all you can. Right-click for the full dialog.'
+      : 'Click on the commodity you wish to buy or sell.'}
+    <button class="quick" class:on={quick} onclick={() => shortcuts.toggle(co.id, 'buy')}>
+      Quick Buy {quick ? 'ON' : 'OFF'}
+    </button>
+  </div>
   <div class="grid">
     <table>
       <thead>
@@ -72,7 +101,14 @@
         {#each game.s.commodities as c (c)}
           {@const def = COMMODITY_BY_ID[c]}
           {@const range = priceRange(def, levelOf(game.s).difficulty)}
-          <tr class:sel={sel === c} onclick={() => open(c)}>
+          <tr
+            class:sel={sel === c}
+            onclick={() => (quick ? quickTrade(c) : open(c))}
+            oncontextmenu={(e) => {
+              e.preventDefault();
+              open(c);
+            }}
+          >
             <td class="name">{def.name}</td>
             <td>{co.cargo[c]?.tons ?? 0}</td>
             <td>{p.stock[c] ?? 0}</td>
@@ -167,6 +203,24 @@
     font: bold 10px/1.2 var(--font-ui);
     text-align: center;
     padding: 3px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+  .quick {
+    font: bold 10px var(--font-ui);
+    padding: 1px 6px;
+    border: 2px solid;
+    border-color: #fff #404040 #404040 #fff;
+    background: var(--c-face);
+    color: #000;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .quick.on {
+    background: var(--c-yellow-plate);
+    border-color: #404040 #fff #fff #404040;
   }
   /* the goods list is the only elastic block: it scrolls so the button row can never be
      pushed off the 640x480 stage */
