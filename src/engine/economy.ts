@@ -118,14 +118,29 @@ export function sharesValue(state: GameState, co: CompanyState): number {
 }
 
 /**
- * Net worth: humans = shares + cash + savings − loans; opponents = shares + cash.
- * Cargo, warehouse, ship, facilities and owed taxes/wages are excluded.
+ * Goods held, valued at what they cost rather than at today's market price: buying a hold
+ * full of gems must not move net worth on its own, only selling them may.
+ */
+export function cargoAtCost(co: CompanyState): number {
+  let v = 0;
+  for (const lot of Object.values(co.cargo)) v += lot.tons * lot.paid;
+  for (const store of Object.values(co.warehouse))
+    for (const lot of Object.values(store)) v += lot.tons * lot.paid;
+  return v;
+}
+
+/**
+ * Net worth: humans = shares + cash + savings + goods at cost − loans; opponents = shares + cash
+ * (they settle every trip in cash and never hold goods between weeks).
+ * Ship, facilities and owed taxes/wages are excluded.
  */
 export function netWorth(state: GameState, co: CompanyState): number {
   if (co.bankrupt) return -10_000_000_000;
   const shares = sharesValue(state, co);
   if (co.isAI) return Math.floor(shares + co.cash);
-  return Math.floor(shares + co.cash + co.bank - co.unionLoan - co.zinnLoan);
+  return Math.floor(
+    shares + co.cash + co.bank + cargoAtCost(co) - co.unionLoan - co.zinnLoan,
+  );
 }
 
 /**
