@@ -81,6 +81,10 @@
   {:else if online.status === 'connecting'}
     <div class="box">
       <p>Connecting to room <b>{online.code}</b>… waiting for the host.</p>
+      <p class="note">
+        This takes a few seconds: the browsers have to find a way through to each other. If nothing
+        happens, we give up after {online.joinTimeout} seconds and say why.
+      </p>
       <Btn onclick={() => online.leave()}>Cancel</Btn>
     </div>
   {:else if lobby}

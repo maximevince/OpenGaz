@@ -156,6 +156,33 @@ describe('online lockstep guards', () => {
   });
 });
 
+describe('joining a room that never answers', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    online.leave();
+    vi.useRealTimers();
+  });
+
+  it('gives up and says what usually causes it', () => {
+    online.join('ABCDEF', 'Guest');
+    expect(online.status).toBe('connecting');
+
+    vi.advanceTimersByTime(online.joinTimeout * 1000);
+    expect(online.status).toBe('error');
+    expect(online.error).toMatch(/ABCDEF/);
+    expect(online.code).toBe('ABCDEF'); // kept, so the screen can name the room
+  });
+
+  it('stops the clock once the host answers', () => {
+    online.join('ABCDEF', 'Guest');
+    deliver('lobby', lobbyFor(fresh()), HOST);
+    expect(online.status).toBe('lobby');
+
+    vi.advanceTimersByTime(online.joinTimeout * 3000);
+    expect(online.status).toBe('lobby');
+  });
+});
+
 describe('lobby seats', () => {
   afterEach(() => online.leave());
 
