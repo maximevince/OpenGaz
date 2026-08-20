@@ -1,5 +1,6 @@
 <script lang="ts">
   import { LEVEL_BY_ID, PLANET_BY_ID, SHIP_BY_ID, netWorth, sharesValue } from '../../engine';
+  import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import Plate from '../components/Plate.svelte';
   import { fmt } from '../format';
@@ -34,6 +35,7 @@
   const maxAbs = $derived(Math.max(1, ...s.companies.map((c) => Math.abs(netWorth(s, c)))));
   const maxY = $derived(Math.max(100000, ...all));
   const y = (v: number) => H - PB - ((v - minY) / (maxY - minY)) * (H - PB - 10);
+  const shipPic = $derived(img(`ship.${co.ship.defId}.picture`));
   const strengthTotal = $derived(
     alive.reduce((a, x) => a + x.c.ship.cargo + x.c.ship.seats * 10, 0),
   );
@@ -130,14 +132,23 @@
         {/each}
       </div>
     {:else}
-      <div class="plates">
-        <Plate label="Ship:" value={SHIP_BY_ID(co.ship.defId).name} />
-        <Plate label="Cargo bay:" value={`${co.ship.cargo} tons`} />
-        <Plate label="Passenger seats:" value={co.ship.seats} />
-        <Plate label="Fuel tank:" value={`${co.ship.fuelCap} tons`} />
-        <Plate label="Engine:" value={`${co.ship.kuarps} kuarps`} />
-        <Plate label="Crew:" value={co.ship.crew} />
-        <Plate label="Class:" value={`${co.ship.tons}-ton`} />
+      <div class="ship">
+        <div
+          class="pic"
+          class:empty={!shipPic}
+          style:background-image={shipPic ? `url(${shipPic})` : undefined}
+        >
+          {#if !shipPic}<span>{SHIP_BY_ID(co.ship.defId).name}</span>{/if}
+        </div>
+        <div class="plates">
+          <Plate label="Ship:" value={SHIP_BY_ID(co.ship.defId).name} />
+          <Plate label="Cargo bay:" value={`${co.ship.cargo} tons`} />
+          <Plate label="Passenger seats:" value={co.ship.seats} />
+          <Plate label="Fuel tank:" value={`${co.ship.fuelCap} tons`} />
+          <Plate label="Engine:" value={`${co.ship.kuarps} kuarps`} />
+          <Plate label="Crew:" value={co.ship.crew} />
+          <Plate label="Class:" value={`${co.ship.tons}-ton`} />
+        </div>
       </div>
     {/if}
   </div>
@@ -169,6 +180,28 @@
     grid-template-columns: 1fr;
     position: relative;
     overflow: hidden;
+  }
+  /* Ship Info: the dealer picture beside the spec plates */
+  .ship {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .pic {
+    background: #000 center / contain no-repeat;
+    border: 2px solid;
+    border-color: #404040 #fff #fff #404040;
+  }
+  .pic.empty {
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 40%, #303060, #000 70%);
+    color: #fff;
+    font: bold 15px var(--font-ui);
+    text-align: center;
+    padding: 8px;
   }
   .plates {
     display: flex;
