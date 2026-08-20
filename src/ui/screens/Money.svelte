@@ -55,7 +55,18 @@
 
   // net-worth bars use the recorded figure, so they agree with the history line's last point
   const bars = $derived(s.companies.map((c, i) => ({ c, i, v: atWeekStart(c) })));
-  const maxAbs = $derived(Math.max(1, ...bars.map((b) => Math.abs(b.v))));
+  /**
+   * The bars diverge from a shared zero: debt grows left, worth grows right, both measured
+   * against the same kubar-per-pixel scale. The track is split by the deepest debt's share of
+   * the whole span, so with nobody in the red the zero line sits flush against the left edge
+   * and the bars read exactly as they did before.
+   */
+  const maxNeg = $derived(Math.max(0, ...bars.map((b) => -b.v)));
+  const maxPos = $derived(Math.max(0, ...bars.map((b) => b.v)));
+  const span = $derived(Math.max(1, maxNeg + maxPos));
+  const negFrac = $derived(maxNeg / span);
+  /** length within a half; the halves are already proportional, so this stays to scale */
+  const barPct = (v: number, max: number) => Math.max(2, (Math.abs(v) / max) * 100);
 
   // market strength: share of the fleet's total mass, as a pie
   const alive = $derived(s.companies.map((c, i) => ({ c, i })).filter((x) => !x.c.bankrupt));
@@ -135,12 +146,30 @@
           <div class="barrow">
             <span class="bn">{c.name}</span>
             <div
-              class="bar"
-              class:neg={v < 0}
-              style:width={`${Math.max(2, (Math.abs(v) / maxAbs) * 100)}%`}
-              style:background={colors[i % colors.length]}
-            ></div>
-            <span class="bv">{c.bankrupt ? 'BANKRUPT' : fmt(v)}</span>
+              class="track"
+              style:grid-template-columns={`${negFrac * 100}% ${(1 - negFrac) * 100}%`}
+              style:--zero={`${negFrac * 100}%`}
+            >
+              <div class="half owed">
+                {#if v < 0}
+                  <div
+                    class="bar neg"
+                    style:width={`${barPct(v, maxNeg)}%`}
+                    style:background={colors[i % colors.length]}
+                  ></div>
+                {/if}
+              </div>
+              <div class="half worth">
+                {#if v > 0}
+                  <div
+                    class="bar"
+                    style:width={`${barPct(v, maxPos)}%`}
+                    style:background={colors[i % colors.length]}
+                  ></div>
+                {/if}
+              </div>
+            </div>
+            <span class="bv" class:red={v < 0}>{c.bankrupt ? 'BANKRUPT' : fmt(v)}</span>
           </div>
         {/each}
         <div class="goal">goal: {fmt(target)}</div>
@@ -321,17 +350,34 @@
     gap: 8px;
     align-items: center;
   }
+  .track {
+    display: grid;
+    align-items: center;
+    /* the zero line, drawn on the seam between the two halves */
+    background: linear-gradient(#000, #000) no-repeat;
+    background-size: 1px 100%;
+    background-position-x: var(--zero, 0);
+  }
+  .half {
+    display: flex;
+    min-width: 0;
+  }
+  .half.owed {
+    justify-content: flex-end;
+  }
   .bar {
     height: 22px;
     border: 1px solid #000;
     box-shadow: 2px 2px 0 #000;
-    min-width: 2px;
   }
   .bv {
     text-align: right;
   }
+  .bv.red {
+    color: #a00000;
+  }
   .neg {
-    opacity: 0.45;
+    box-shadow: -2px 2px 0 #000;
     background-image: repeating-linear-gradient(
       45deg,
       transparent 0 4px,
