@@ -104,7 +104,35 @@ const rush = (freq: number, noise: number, vol = 0.6): Preset =>
     decay: 0.12,
   });
 
-const PRESETS: Record<string, Preset> = {
+/**
+ * A jingle: several voices fired at fixed offsets. One ZzFX call is one note, so anything with a
+ * tune to it — a news sting, a fanfare — has to be a small schedule rather than a single preset.
+ */
+interface Jingle {
+  seq: { at: number; p: Preset }[];
+}
+type Sound = Preset | Jingle;
+const isJingle = (s: Sound): s is Jingle => 'seq' in s;
+
+/** notes at `gap` ms apart, the last one held — brass-band shorthand */
+const fanfare = (freqs: number[], gap: number, shape: Shape = 2, vol = 0.5): Jingle => ({
+  seq: freqs.map((freq, i) => ({
+    at: i * gap,
+    p: voice({
+      freq,
+      shape,
+      vol,
+      attack: 0.005,
+      sustain: i === freqs.length - 1 ? 0.1 : 0.03,
+      release: i === freqs.length - 1 ? 0.25 : 0.08,
+      curve: 1.8,
+      sustainVol: 0.7,
+      decay: 0.03,
+    }),
+  })),
+});
+
+const PRESETS: Record<string, Sound> = {
   /* --- generic UI --------------------------------------------------------------------- */
   click: [0.6, _, 1200, _, 0.01, 0.02, 1, 1.5, _, _, _, _, _, _, _, _, _, 0.6, 0.01],
   help: blip(980, 0, 0.45),
@@ -141,7 +169,7 @@ const PRESETS: Record<string, Preset> = {
   special: chime(880, 320, 1, 0.55),
 
   /* --- explore -------------------------------------------------------------------------- */
-  news: blip(740, 2, 0.45),
+  news: fanfare([587, 740, 988], 95), // three rising notes, like a bulletin opening
   weather: rush(420, 0.9, 0.45),
   clock: blip(1040, 0, 0.4),
   history: blip(360, 1, 0.45),
@@ -245,10 +273,15 @@ export function play(id: string, volume = 1): void {
       return;
     }
     const p = PRESETS[id];
-    if (p) {
+    if (!p) return;
+    // the volume is global to ZzFX, so each note has to set it again when its turn comes
+    const fire = (n: Preset) => {
+      if (muted) return;
       ZZFX.volume = 0.3 * volume;
-      ZZFX.play(...p);
-    }
+      ZZFX.play(...n);
+    };
+    if (isJingle(p)) for (const n of p.seq) setTimeout(() => fire(n.p), n.at);
+    else fire(p);
   } catch {
     /* audio not available */
   }
