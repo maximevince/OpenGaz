@@ -82,6 +82,8 @@ class GameStore {
   error = $state<string | null>(null);
   /** which screen's help dialog is open */
   helpFor = $state<Screen | null>(null);
+  /** dev only: what produced the newest state, read and cleared by the debug panel's trace */
+  lastCommit: { action: Action; ms: number } | null = null;
   /** company index the UI is currently showing (for hot-seat handoff detection) */
   private shownCompany = -1;
   /** last week whose standings report has been shown (once per week, not per player) */
@@ -110,8 +112,10 @@ class GameStore {
 
   private applyRemote(a: Action) {
     if (!this.state) return;
+    const t0 = import.meta.env.DEV ? performance.now() : 0;
     try {
       this.state = applyAction(this.state, a);
+      if (import.meta.env.DEV) this.lastCommit = { action: a, ms: performance.now() - t0 };
     } catch (e) {
       // desync: ask the host for a fresh snapshot
       console.warn('remote action rejected, requesting sync', e);
@@ -174,8 +178,10 @@ class GameStore {
       return false;
     }
     const trade = a.type === 'buy' || a.type === 'sell' ? soundForTrade(this.state, a) : '';
+    const t0 = import.meta.env.DEV ? performance.now() : 0;
     try {
       this.state = applyAction(this.state, a);
+      if (import.meta.env.DEV) this.lastCommit = { action: a, ms: performance.now() - t0 };
       this.error = null;
     } catch (e) {
       this.error = e instanceof ActionError ? e.message : String(e);
