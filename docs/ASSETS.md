@@ -120,24 +120,18 @@ Fallback while art lands: `procgen.ts` (already shipping) — deterministic SVG 
 
 Three layers, cheapest first; the UI calls `sfx('<id>')` and gets whatever the pack provides.
 
-1. **Synth in code (zero assets)** — [ZzFX](https://github.com/KilledByAPixel/ZzFX) (MIT, ~1 kB):
-   UI click, coin/kubar, buy/sell, page flip, warning buzz, engine hum, event stings (good /
-   neutral / bad), stock crash. Parameter arrays live in `src/ui/sound.ts` under GPL. Music
-   fallback: [ZzFXM](https://github.com/keithclark/ZzFXM) tracker tunes authored by us (title
-   loop, travel loop, win/lose jingles).
-2. **CC0 sample packs** for richer foley, dropped into `assets/src/sfx/` and listed in
-   SOURCES.md:
-   - Kenney — _Interface Sounds_, _UI Audio_, _Sci-Fi Sounds_, _Digital Audio_, _Impact Sounds_
-     (all CC0, kenney.nl/assets).
-   - OpenGameArt.org filtered CC0 (rocket, explosion, alarm, cash register, crowd, thunder).
-   - freesound.org filtered CC0 (search terms: whoosh, cash register, cartoon boing, slide
-     whistle, alarm, thunder, crowd cheer, sad trombone).
-3. **Music** — either our own ZzFXM/OPL-style chiptunes, or CC0/CC-BY tracks (OpenGameArt
-   CC0 space/lounge loops; Kevin MacLeod tracks are CC-BY 4.0 → keep credit line).
+1. **CC0 samples** — 43 of the 61 ids, from Kenney's CC0 packs (_Interface Sounds_, _UI Audio_,
+   _Digital Audio_, _Casino Audio_, _Impact Sounds_, _Sci-Fi Sounds_, _Music Jingles_). Masters
+   in `assets/src/sfx/<id>.ogg`, every file listed in SOURCES.md.
+2. **Synth in code** — [ZzFX](https://github.com/KilledByAPixel/ZzFX) (MIT, ~1 kB) covers every
+   id that has no sample, so nothing is ever silent. Parameter arrays live in `src/ui/sound.ts`
+   under GPL. Still synth-only: the eighteen `commodity.*` trade noises.
+3. **Music** — not started. Either our own ZzFXM/OPL-style chiptunes, or public-domain scores
+   rendered by us (see §6), or CC0/CC-BY tracks (Kevin MacLeod is CC-BY 4.0 → keep credit line).
 
-Sound id taxonomy — the 61 ids the game actually plays, all currently synthesised. Dropping
-`<id>.wav` into `assets/src/sfx/` and rebuilding makes the sample win over the synth, one id at
-a time; nothing else has to change.
+Sound id taxonomy — the 61 ids the game actually plays. Dropping `<id>.ogg` or `<id>.wav` into
+`assets/src/sfx/` and rebuilding makes the sample win over the synth, one id at a time; nothing
+else has to change.
 
 - interface: `click`, `help`, `ping` (a choice on a picker), `select` (a ship), `error`,
   `unlock` (a tutorial feature arrives)
@@ -164,8 +158,11 @@ in for. `?pack=opengaz` in the URL forces the shipped pack back. The 12 with no 
 `click`, `error`, `unlock`, `buy`, `sell`, `market`, `warehouse`, `money`, `map`, `special`,
 `arrive`, `lose` — are ours to invent.
 
-Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WAV masters in
-`assets/src/sfx/`.
+Sound files: mono, 22 050 Hz, OGG (Vorbis, ~q2) in `public/assets/sfx/`; masters in
+`assets/src/sfx/` as OGG or WAV, whatever the source pack shipped. The build peak-normalises the
+shipped copy to −3 dBFS — measuring the encode and correcting once, because resampling and lossy
+coding overshoot — so sounds gathered from different packs sit at the same level. Masters are
+never modified by the build.
 
 ## 6. Order of work
 
@@ -176,7 +173,8 @@ Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WA
 4. Create: title + 14 planet larges + 12 ships first (most visible), then portraits, then
    surfaces/icons; iterate style until coherent; commit masters + built output + SOURCES rows.
 5. Wire every id above to where it is played, synth-only — done.
-6. CC0 sfx pass: replace the synth with samples, id by id, recording each source in SOURCES.md.
+6. CC0 sfx pass: replace the synth with samples, id by id, recording each source in SOURCES.md —
+   done for 43 ids; the eighteen `commodity.*` noises are still open.
 7. Music: a `music/` master tree with its own encode spec (stereo, 44.1 kHz), a looping channel
    separate from the effects channel, and a three-way sound setting (off / effects / everything).
    Public-domain scores rendered by us, so the recording is ours to license.
