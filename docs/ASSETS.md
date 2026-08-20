@@ -155,7 +155,14 @@ Music ids (`music.*`) are not wired yet.
 
 **Sound test screen**: run `pnpm dev` and use the _Sound test_ button on the title screen or in
 File Options — every id with a play button, marked by whether it is coming from a sample or the
-synth. That is the fastest way to audition a candidate pack.
+synth, and headed by which pack is answering. That is the fastest way to audition a candidate
+pack.
+
+It also works against the dev-only reference pack (`pnpm assets:original`, gitignored, never
+committed or deployed): 49 of the 61 ids resolve there, so each one can be heard as a reference
+before a CC0 substitute is chosen for it. `?pack=opengaz` in the URL forces the shipped pack
+back. The 12 with no reference — `click`, `error`, `unlock`, `buy`, `sell`, `market`,
+`warehouse`, `money`, `map`, `special`, `arrive`, `lose` — are ours to invent.
 
 Sound files: mono, 22 050 Hz, OGG (Vorbis, ~48 kbps) in `public/assets/sfx/`, WAV masters in
 `assets/src/sfx/`.
