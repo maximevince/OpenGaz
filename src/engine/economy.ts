@@ -4,6 +4,7 @@
 import { COMMODITY_BY_ID, priceRange, type CommodityId } from './data/commodities';
 import { ECON, LEVEL_BY_ID } from './data/levels';
 import { slotDistance } from './data/planets';
+import { FEATURE_STAGE, type Feature } from './data/tutorial';
 import type { Rng } from './rng';
 import type { CompanyState, GameState, LogEntry, PlanetState } from './types';
 
@@ -204,6 +205,18 @@ export function adCost(tier: number, co: CompanyState): number {
 /** Roll the next trip's insurance premium: `fint(range, range*1000)`. */
 export function rollInsuranceCost(co: CompanyState, r: Rng): number {
   return r.fint(co.insurancePriceRange, co.insurancePriceRange * 1000);
+}
+
+/* ---------------------------------------------------------- tutorial */
+
+/**
+ * Is this feature available yet? Everything is open outside the Tutorial level; inside it a
+ * feature waits for its stage. Gate rules with this as well as buttons — the point of the
+ * ladder is that nobody is taxed or outbid by a system they have not met.
+ */
+export function unlocked(state: GameState, feature: Feature): boolean {
+  if (!state.settings.tutorial) return true;
+  return state.tutorStage >= FEATURE_STAGE[feature];
 }
 
 /* ------------------------------------------------------------- misc */

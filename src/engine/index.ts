@@ -18,3 +18,4 @@ export * from './data/commodities';
 export * from './data/ships';
 export * from './data/opponents';
 export * from './data/levels';
+export * from './data/tutorial';

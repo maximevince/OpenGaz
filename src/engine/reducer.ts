@@ -8,6 +8,7 @@
 import { COMMODITY_BY_ID, type CommodityId } from './data/commodities';
 import { ECON, LEVEL_BY_ID } from './data/levels';
 import { RIVAL_TAUNTS } from './data/opponents';
+import { FINAL_STAGE, isRestWeek, scheduledStage } from './data/tutorial';
 import { PLANET_BY_ID } from './data/planets';
 import { moveOpponents, runOpponents } from './ai';
 import { auctionReportFor, recordBid, runAuctionWeek } from './auctions';
@@ -24,6 +25,7 @@ import {
   pushLog,
   rollInsuranceCost,
   subtractCash,
+  unlocked,
   warehouseTons,
 } from './economy';
 import {
@@ -143,7 +145,17 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
   need(state.phase !== 'gameOver', 'game is over');
   if (a.type === 'continue') return doContinue(state, r);
   if (a.type === 'eventChoice') return doEventChoice(state, a.choice, a.amount, r);
+  if (a.type === 'tutorialContinue') {
+    state.tutorPending = false;
+    state.tutorTaught = Math.max(state.tutorTaught, state.tutorStage);
+    // reading the last lesson retires the ladder: every gate stays open from here
+    if (state.tutorStage >= FINAL_STAGE) state.settings.tutorial = false;
+    return;
+  }
+  if (a.type === 'tutorialAdvance') return doTutorialAdvance(state);
   need(state.phase === 'onPlanet', `cannot ${a.type} now (${state.phase})`);
+  // the lesson is a gate, not a suggestion: nothing else happens until it is read
+  need(!state.tutorPending, 'read the lesson first');
   need(!state.pending, 'answer the open dialog first');
   const co = currentCompany(state);
   const p = state.planets[co.planet]!;
@@ -214,7 +226,9 @@ function dispatch(state: GameState, a: Action, r: Rng): void {
       co.passengers = co.paxWaiting;
       const income = co.paxPrice * co.passengers;
       co.cash += income;
-      co.taxOwedPassenger += Math.floor((income * state.econ.passTax) / 100);
+      if (unlocked(state, 'tax')) {
+        co.taxOwedPassenger += Math.floor((income * state.econ.passTax) / 100);
+      }
       return;
     }
     /* ---- advertising ---- */
@@ -471,15 +485,23 @@ function depart(state: GameState, co: CompanyState, to: number, r: Rng): void {
   if (co.ship.cargo > 100) destPlanet.advertC += co.ship.cargo - 100;
   state.sellingProfit = 0;
   co.specialUsed = false;
-  co.loanInterest = Math.floor((co.unionLoan * co.loanRate) / 100);
-  co.unionLoan += co.loanInterest;
-  co.savingsInterest = Math.floor((co.bank * co.savingsRate) / 100);
-  co.bank += co.savingsInterest;
-  co.zinnInterest = Math.floor((co.zinnLoan * co.zinnRate) / 100);
-  co.zinnLoan += co.zinnInterest;
-  co.wagesOwed += co.crewSalary * co.ship.crew;
+  // each charge waits for the feature that explains it, so the tutorial never bills a player
+  // for a system they have not been shown
+  if (unlocked(state, 'loan')) {
+    co.loanInterest = Math.floor((co.unionLoan * co.loanRate) / 100);
+    co.unionLoan += co.loanInterest;
+  }
+  if (unlocked(state, 'bank')) {
+    co.savingsInterest = Math.floor((co.bank * co.savingsRate) / 100);
+    co.bank += co.savingsInterest;
+  }
+  if (unlocked(state, 'zinn')) {
+    co.zinnInterest = Math.floor((co.zinnLoan * co.zinnRate) / 100);
+    co.zinnLoan += co.zinnInterest;
+  }
+  if (unlocked(state, 'crew')) co.wagesOwed += co.crewSalary * co.ship.crew;
 
-  if (state.week > 3 && beginEventRoll(state, co, ci, r)) return; // wait for the dialog
+  if (state.week > 3 && unlocked(state, 'loan') && beginEventRoll(state, co, ci, r)) return;
   finishDeparture(state, co, r);
 }
 
@@ -498,9 +520,13 @@ function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
   endChainStreak(state, co);
   applyEventGoodFloor(state, co);
 
-  co.ship.fuel -= fuelUsage(dist, co.ship.tons, r);
+  if (unlocked(state, 'fuel')) co.ship.fuel -= fuelUsage(dist, co.ship.tons, r);
 
-  if (co.wagesOwed >= co.ship.crew * co.crewSalary * 5 && r.fint(1, 3) === 1) {
+  if (
+    unlocked(state, 'crew') &&
+    co.wagesOwed >= co.ship.crew * co.crewSalary * 5 &&
+    r.fint(1, 3) === 1
+  ) {
     const owed = co.wagesOwed;
     forcePay(state, co, owed, 'the crew strike settlement');
     co.wagesOwed = 0;
@@ -514,7 +540,7 @@ function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
   }
 
   // states 4/5 — out of fuel
-  if (co.ship.fuel < 0) {
+  if (unlocked(state, 'fuel') && co.ship.fuel < 0) {
     const cost = co.ship.fuelCap * state.econ.fuelPriceRange * 10 + 10000;
     forcePay(state, co, cost, 'the emergency tanker');
     co.ship.fuel = co.ship.fuelCap;
@@ -529,7 +555,7 @@ function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
 
   // state 6 — tax audit
   const owed = co.taxOwedPassenger + co.taxOwedTariff;
-  if (owed >= 35 * co.ship.tons && r.fint(1, 3) === 1) {
+  if (unlocked(state, 'tax') && owed >= 35 * co.ship.tons && r.fint(1, 3) === 1) {
     const bill = 3 * owed;
     forcePay(state, co, bill, 'the tax audit');
     co.taxOwedPassenger = 0;
@@ -543,11 +569,13 @@ function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
   }
 
   // state 7 — exit
-  const exportTax = Math.floor(
-    (cargoMarketValue(co, state.planets[from]!) * state.econ.exportTariff) / 100,
-  );
-  if (exportTax > 0) co.taxOwedTariff += exportTax;
-  co.insuranceCost = rollInsuranceCost(co, r);
+  if (unlocked(state, 'tax')) {
+    const exportTax = Math.floor(
+      (cargoMarketValue(co, state.planets[from]!) * state.econ.exportTariff) / 100,
+    );
+    if (exportTax > 0) co.taxOwedTariff += exportTax;
+  }
+  if (unlocked(state, 'insurance')) co.insuranceCost = rollInsuranceCost(co, r);
   computePassengers(co, r);
   co.insured = false;
   co.advertInvestedP = 0;
@@ -679,6 +707,8 @@ function enterTurn(state: GameState): void {
     co.inbox = [];
   }
   state.awaitingHandoff = false;
+  // the lesson is owed per player per week, but never in a rest week
+  state.tutorPending = state.settings.tutorial && !isRestWeek(state.week);
   state.phase = state.arrivalReports.length ? 'arrival' : 'onPlanet';
 }
 
@@ -720,13 +750,14 @@ function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
   reportNeighbours(state, co, ci);
 
   // import tariff — only assessed if you already owe something (a quirk of the original)
-  if (co.taxOwedPassenger + co.taxOwedTariff !== 0) {
+  if (unlocked(state, 'tax') && co.taxOwedPassenger + co.taxOwedTariff !== 0) {
     const tax = Math.floor((cargoMarketValue(co, p) * state.econ.importTariff) / 100);
     if (tax > 0) {
       co.taxOwedTariff += tax;
       report(state, 'info', `Import tariff of ${fmt(tax)} kubars assessed on your cargo.`);
     }
   }
+  if (!unlocked(state, 'facility')) return; // no landing fees before the auctions are explained
   for (const f of p.facilities) {
     if (f.owner === ci) {
       if (f.revenue > 0) {
@@ -776,6 +807,48 @@ function declareBankrupt(state: GameState, co: CompanyState, ci: number): void {
   ];
 }
 
+/* --------------------------------------------------------------- tutorial */
+
+/**
+ * "Add New Feature". Only a solo player gets to set the pace — with more than one human at the
+ * table nobody may unlock things on everyone else's behalf, so those games take one stage per
+ * week instead (see the rollover below).
+ */
+function doTutorialAdvance(state: GameState): void {
+  need(state.settings.tutorial, 'the tutorial is not running');
+  need(state.tutorStage >= FEATURE_STAGE_SELF_PACED, 'the schedule is still handing these out');
+  need(state.tutorStage < FINAL_STAGE, 'every feature is already unlocked');
+  need(
+    state.companies.filter((c) => !c.isAI && !c.bankrupt).length === 1,
+    'in a shared game a feature arrives every week instead',
+  );
+  state.tutorStage++;
+  state.tutorPending = true; // show the lesson for what was just unlocked
+}
+
+/** From this stage on the player, not the calendar, decides when the next feature lands. */
+const FEATURE_STAGE_SELF_PACED = 7;
+
+/**
+ * Move the ladder on at the week rollover: the opening stages arrive on their timetable, and
+ * from stage 7 a shared game hands out one a week. Past the last stage the tutorial retires and
+ * every gate stays open for good.
+ */
+function stepTutorial(state: GameState): void {
+  if (!state.settings.tutorial) return;
+  const forced = scheduledStage(state.week);
+  if (forced !== null && forced > state.tutorStage) state.tutorStage = forced;
+  const humans = state.companies.filter((c) => !c.isAI && !c.bankrupt).length;
+  if (
+    humans > 1 &&
+    state.tutorStage >= FEATURE_STAGE_SELF_PACED &&
+    state.tutorStage < FINAL_STAGE
+  ) {
+    state.tutorStage++;
+  }
+  if (state.tutorStage > FINAL_STAGE) state.tutorStage = FINAL_STAGE;
+}
+
 /* ------------------------------------------------------------ week rollover */
 
 /** The week rolls over once every human has moved. */
@@ -784,16 +857,20 @@ function endWeek(state: GameState, r: Rng): void {
 
   runOpponents(state, r); // the six rivals act in one batch first
   stepStockMarket(state, r); // (1)
-  rollNewsEvent(state, r); // (2)
-  rollWeather(state, r); // (3)
+  // News and weather only start reporting once the city is fully open — before that the
+  // player has nowhere to read them, and a hazard nobody can be warned about is just a mugging
+  if (unlocked(state, 'explore')) {
+    rollNewsEvent(state, r); // (2)
+    rollWeather(state, r); // (3)
+  }
   moveOpponents(state, r); // (4) rivals pick a destination; human order rebuilt below
-  if (state.week > 2) runAuctionWeek(state, r); // (5)
+  if (state.week > 2 && unlocked(state, 'facility')) runAuctionWeek(state, r); // (5)
   economicChange(state, r); // (6)
   commodityAvailable(state, r); // (7)
   commodityPrice(state); // (8)
   rollFuelPrices(state, r); // (9)
   if (state.week > 4) gameEvents(state, r); // (10)
-  if (state.week > 4) opponentEvents(state, r); // (11)
+  if (state.week > 4 && unlocked(state, 'stock')) opponentEvents(state, r); // (11)
 
   for (const co of state.companies) {
     // (12) + (13): net worth is only recomputed here, and history is a 21-week ring.
@@ -802,6 +879,8 @@ function endWeek(state: GameState, r: Rng): void {
     co.netWorthHistory.push(co.bankrupt ? 0 : netWorth(state, co));
     if (co.netWorthHistory.length > 21) co.netWorthHistory.shift();
   }
+
+  stepTutorial(state); // the ladder moves on before anyone's new turn begins
 
   if (checkWinner(state)) return; // (14)
 
