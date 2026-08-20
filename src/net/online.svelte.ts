@@ -15,7 +15,15 @@
  * Every one of those failures resolves the same way: ask the host for a fresh snapshot.
  */
 import { joinRoom, selfId, type Room } from 'trystero/nostr';
-import { currentIndex, type Action, type GameState, type Level, type PlanetId } from '../engine';
+import {
+  Rng,
+  currentIndex,
+  randomCompanyName,
+  type Action,
+  type GameState,
+  type Level,
+  type PlanetId,
+} from '../engine';
 
 const APP_ID = 'opengaz-v1';
 /** how long a join waits for the host to answer before calling it a failure */
@@ -49,6 +57,13 @@ type Act = { action: Action; week: number; turn: number; rng: number; n: number 
 type Sync = { state: GameState; lobby: Lobby; seq: number };
 
 export type OnlineStatus = 'idle' | 'connecting' | 'lobby' | 'playing' | 'error';
+
+/** Throwaway randomness for placeholder company names — never the game seed. */
+function nameRng(): Rng {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return new Rng(buf[0]!);
+}
 
 function makeCode(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -126,7 +141,7 @@ class Online {
     this.connect(code, playerName);
     this.lobby = {
       host: selfId,
-      seats: [{ name: `${playerName}'s Trading Co.`, ship: 1, peer: selfId, player: playerName }],
+      seats: [{ name: randomCompanyName(nameRng()), ship: 1, peer: selfId, player: playerName }],
       ai,
       level,
       planets: null,
@@ -251,7 +266,7 @@ class Online {
         const s = this.lobby.seats[d.seat]!;
         s.peer = peerId;
         s.player = d.name;
-        s.name = s.name || `${d.name}'s Trading Co.`;
+        s.name = s.name || randomCompanyName(nameRng(), { taken: this.seatNames() });
       }
       this.broadcastLobby();
     };
@@ -336,12 +351,16 @@ class Online {
   addSeat(): void {
     if (!this.isHost || !this.lobby || this.lobby.seats.length >= 6) return;
     this.lobby.seats.push({
-      name: `Company ${this.lobby.seats.length + 1}`,
+      name: randomCompanyName(nameRng(), { taken: this.seatNames() }),
       ship: 1 + (this.lobby.seats.length % 12),
       peer: null,
       player: '',
     });
     this.broadcastLobby();
+  }
+  /** Company names already on the board, so a fresh one never duplicates. */
+  private seatNames(): string[] {
+    return this.lobby?.seats.map((s) => s.name) ?? [];
   }
   removeSeat(i: number): void {
     if (!this.isHost || !this.lobby || this.lobby.seats.length <= 1) return;

@@ -4,7 +4,9 @@
     LEVELS,
     OPPONENTS,
     PLANETS,
+    Rng,
     SHIPS,
+    randomCompanyName,
     type Level,
     type PlanetId,
   } from '../../engine';
@@ -16,7 +18,11 @@
   let level: Level = $state('novice');
   let opponents: string[] = $state(OPPONENTS.slice(0, 5).map((o) => o.id));
   const ai = $derived(opponents.length);
-  let humans: { name: string; ship: number }[] = $state([{ name: 'Slev & Sons', ship: 1 }]);
+  // placeholder names only: one throwaway Rng for the whole screen, never the game seed
+  const nameRng = new Rng((Math.random() * 0x1_0000_0000) >>> 0);
+  let humans: { name: string; ship: number }[] = $state([
+    { name: randomCompanyName(nameRng), ship: 1 },
+  ]);
   let planets: PlanetId[] = $state(randomPlanets());
   let seed = $state(String(Date.now() % 1000000));
   let shipPick: number | null = $state(null);
@@ -28,6 +34,12 @@
       [ids[i], ids[j]] = [ids[j]!, ids[i]!];
     }
     return ids.slice(0, 7);
+  }
+  function reroll(i: number) {
+    play('ping');
+    humans[i]!.name = randomCompanyName(nameRng, {
+      taken: humans.filter((_, j) => j !== i).map((h) => h.name),
+    });
   }
   function toggle(id: PlanetId) {
     play('ping');
@@ -66,6 +78,9 @@
       {#each humans as h, i (i)}
         <div class="row">
           <input class="name" bind:value={h.name} placeholder="Company name" maxlength="24" />
+          <button class="dice" title="Random company name" onclick={() => reroll(i)}
+            >&#127922;</button
+          >
           <button
             class="ship"
             onclick={() => {
@@ -84,7 +99,10 @@
         onclick={() =>
           (humans = [
             ...humans,
-            { name: `Player ${humans.length + 1}`, ship: 1 + (humans.length % 12) },
+            {
+              name: randomCompanyName(nameRng, { taken: humans.map((h) => h.name) }),
+              ship: 1 + (humans.length % 12),
+            },
           ])}>+ add human</Btn
       >
       <h3>Computer opponents ({ai})</h3>
@@ -232,8 +250,17 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto;
     gap: 4px;
+  }
+  .dice {
+    background: var(--c-face);
+    border: 2px solid;
+    border-color: #fff #404040 #404040 #fff;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px 6px;
   }
   input,
   select {

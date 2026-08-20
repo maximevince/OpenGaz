@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { LEVELS, SHIPS } from '../../engine';
+  import { LEVELS, Rng, SHIPS, randomPlayerName } from '../../engine';
   import { online } from '../../net/online.svelte';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
 
-  let name = $state(localStorage.getItem('opengaz.player') ?? '');
+  // placeholder identity only; a returning player keeps whatever they typed last time
+  const nameRng = new Rng((Math.random() * 0x1_0000_0000) >>> 0);
+  let name = $state(localStorage.getItem('opengaz.player') || randomPlayerName(nameRng));
   let code = $state(new URLSearchParams(location.search).get('room') ?? '');
   let copied = $state(false);
   const lobby = $derived(online.lobby);
@@ -49,7 +51,15 @@
   <div class="title">Play Online — peer to peer, no server</div>
   {#if online.status === 'idle' || online.status === 'error'}
     <div class="box">
-      <label>Your name <input bind:value={name} maxlength="20" placeholder="e.g. Maxime" /></label>
+      <div class="who-am-i">
+        <!-- the dice stays outside the label, or it lands in the input's accessible name -->
+        <label
+          >Your name <input bind:value={name} maxlength="20" placeholder="e.g. Nova Pike" /></label
+        >
+        <button class="dice" title="Random name" onclick={() => (name = randomPlayerName(nameRng))}
+          >&#127922;</button
+        >
+      </div>
       <div class="two">
         <div class="col">
           <h3>Host a game</h3>
@@ -192,6 +202,25 @@
 </div>
 
 <style>
+  .who-am-i {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .who-am-i label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dice {
+    background: var(--c-face);
+    border: 2px solid;
+    border-color: #fff #404040 #404040 #fff;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px 6px;
+  }
   .lobby {
     position: absolute;
     inset: 0;
