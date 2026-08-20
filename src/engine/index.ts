@@ -17,5 +17,6 @@ export * from './data/planets';
 export * from './data/commodities';
 export * from './data/ships';
 export * from './data/opponents';
+export * from './data/names';
 export * from './data/levels';
 export * from './data/tutorial';
