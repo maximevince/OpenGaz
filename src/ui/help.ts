@@ -60,7 +60,7 @@ export const HELP: Partial<Record<Screen, { title: string; text: string }>> = {
   },
   money: {
     title: 'Money',
-    text: 'Net worth = cash + bank + shares − loans. The first company to reach the goal for this level wins. Company History shows the last 20 weeks; Net Worth and Market Strength compare all companies.',
+    text: 'Net worth = cash + bank + shares + goods at the price you paid − loans; your ship is not counted, but Mr. Zinn\'s debt for it is. The first company to reach the goal for this level wins. Company History shows the last 20 weeks; Net Worth and Market Strength compare all companies.',
   },
   map: {
     title: 'Galaxy Map',
