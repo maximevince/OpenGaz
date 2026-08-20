@@ -238,6 +238,7 @@ const listeners = new Set<() => void>();
 export const isMuted = () => muted;
 export function setMuted(m: boolean) {
   muted = m;
+  if (m) stop();
   try {
     localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   } catch {
@@ -256,10 +257,71 @@ const cache = new Map<string, HTMLAudioElement>();
 /** True when the active pack has a real sample for this id (the synth is the fallback). */
 export const hasSample = (id: string) => !!sfx(`sfx.${id}`);
 
-/** Play a sound by short id (without the `sfx.` prefix). Silent when muted or unknown. */
-export function play(id: string, volume = 1): void {
+/** Where a sound should come from. `auto` prefers a pack sample and falls back to the synth. */
+export type Source = 'auto' | 'pack' | 'synth';
+
+/**
+ * What is sounding right now: a sample element, the synth nodes still ringing, and the timers of
+ * a jingle whose later notes have not fired yet. Kept so playback can be cut short.
+ */
+interface Handle {
+  el?: HTMLAudioElement;
+  nodes: AudioBufferSourceNode[];
+  timers: number[];
+}
+let current: Handle | null = null;
+let playing: string | null = null;
+const playListeners = new Set<() => void>();
+
+/** The id currently sounding, or null. Only samples and jingles report an end. */
+export const playingId = () => playing;
+export function onPlayingChange(l: () => void): () => void {
+  playListeners.add(l);
+  return () => playListeners.delete(l);
+}
+function setPlaying(id: string | null) {
+  if (playing === id) return;
+  playing = id;
+  playListeners.forEach((l) => l());
+}
+
+/** Cut off whatever is sounding. */
+export function stop(): void {
+  const h = current;
+  current = null;
+  if (h) {
+    h.timers.forEach(clearTimeout);
+    h.timers = [];
+    if (h.el) {
+      h.el.pause();
+      h.el.currentTime = 0;
+    }
+    for (const n of h.nodes) {
+      n.onended = null;
+      try {
+        n.stop();
+      } catch {
+        /* already finished */
+      }
+    }
+    h.nodes = [];
+  }
+  setPlaying(null);
+}
+
+/** true while a sample or an unfinished jingle is holding the channel */
+const holding = () => !!current && (!!current.el || current.timers.length > 0);
+
+/**
+ * Play a sound by short id (without the `sfx.` prefix). Silent when muted or unknown.
+ *
+ * A new sound cuts off any sample or half-played jingle still running — samples run to seconds
+ * and would otherwise pile up — but lets a short synth one-shot ring out under it.
+ */
+export function play(id: string, volume = 1, source: Source = 'auto'): void {
   if (muted) return;
-  const url = sfx(`sfx.${id}`);
+  if (holding()) stop();
+  const url = source === 'synth' ? undefined : sfx(`sfx.${id}`);
   try {
     if (url) {
       let a = cache.get(url);
@@ -267,20 +329,43 @@ export function play(id: string, volume = 1): void {
         a = new Audio(url);
         cache.set(url, a);
       }
+      const h: Handle = { el: a, nodes: [], timers: [] };
+      current = h;
       a.volume = volume;
       a.currentTime = 0;
+      a.onended = () => {
+        if (current === h) stop();
+      };
+      setPlaying(id);
       void a.play().catch(() => {});
       return;
     }
+    if (source === 'pack') return; // asked for the sample specifically and there is none
     const p = PRESETS[id];
     if (!p) return;
+    const h: Handle = { nodes: [], timers: [] };
+    current = h;
+    setPlaying(id);
     // the volume is global to ZzFX, so each note has to set it again when its turn comes
     const fire = (n: Preset) => {
-      if (muted) return;
+      if (muted || current !== h) return;
       ZZFX.volume = 0.3 * volume;
-      ZZFX.play(...n);
+      const node = ZZFX.play(...n) as AudioBufferSourceNode | undefined;
+      if (!node) return;
+      h.nodes.push(node);
+      node.onended = () => {
+        h.nodes = h.nodes.filter((x) => x !== node);
+        if (current === h && !h.timers.length && !h.nodes.length) stop();
+      };
     };
-    if (isJingle(p)) for (const n of p.seq) setTimeout(() => fire(n.p), n.at);
+    if (isJingle(p))
+      for (const n of p.seq) {
+        const t = window.setTimeout(() => {
+          h.timers = h.timers.filter((x) => x !== t);
+          fire(n.p);
+        }, n.at);
+        h.timers.push(t);
+      }
     else fire(p);
   } catch {
     /* audio not available */
