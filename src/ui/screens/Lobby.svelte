@@ -9,6 +9,7 @@
   let copied = $state(false);
   const lobby = $derived(online.lobby);
   const canStart = $derived(!!lobby && lobby.seats.some((s) => s.peer) && online.isHost);
+  const unclaimed = $derived(lobby ? lobby.seats.filter((s) => !s.peer).length : 0);
 
   function remember() {
     localStorage.setItem('opengaz.player', name.trim());
@@ -31,7 +32,9 @@
   }
   function start() {
     if (!lobby) return;
-    const seats = lobby.seats;
+    // seats nobody took are dropped here: a company with no player would stall the turn order
+    const seats = online.claimedSeats();
+    if (!seats.length) return;
     game.startOnline({
       seed: lobby.seed,
       level: lobby.level,
@@ -166,9 +169,12 @@
             game.go('title');
           }}>Leave</Btn
         >
-        {#if online.isHost}<Btn color="green" disabled={!canStart} onclick={start}
-            >Start the game</Btn
-          >{:else}<span class="note">Waiting for the host to start…</span>{/if}
+        {#if online.isHost}
+          {#if unclaimed > 0}<span class="note"
+              >{unclaimed} empty seat{unclaimed > 1 ? 's' : ''} will be dropped at the start.</span
+            >{/if}
+          <Btn color="green" disabled={!canStart} onclick={start}>Start the game</Btn>
+        {:else}<span class="note">Waiting for the host to start…</span>{/if}
       </div>
     </div>
   {/if}
