@@ -18,6 +18,8 @@ import { joinRoom, selfId, type Room } from 'trystero/nostr';
 import { currentIndex, type Action, type GameState, type Level, type PlanetId } from '../engine';
 
 const APP_ID = 'opengaz-v1';
+/** how long a join waits for the host to answer before calling it a failure */
+const JOIN_TIMEOUT_MS = 20_000;
 
 export interface Seat {
   name: string; // company name
@@ -71,6 +73,8 @@ class Online {
   /** a snapshot has been asked for and not arrived yet (stops resync storms) */
   private syncPending = false;
   private syncTimer: ReturnType<typeof setTimeout> | null = null;
+  /** gives up on a join that never gets an answer, instead of spinning forever */
+  private joinTimer: ReturnType<typeof setTimeout> | null = null;
   private send: {
     hello?: (d: Hello) => Promise<void>;
     lobby?: (d: Lobby) => Promise<void>;
@@ -89,6 +93,10 @@ class Online {
 
   get selfId() {
     return selfId;
+  }
+  /** seconds a join waits before giving up, for the screen to quote */
+  get joinTimeout() {
+    return JOIN_TIMEOUT_MS / 1000;
   }
   get isHost() {
     return !!this.lobby && this.lobby.host === selfId;
@@ -129,7 +137,21 @@ class Online {
 
   join(code: string, playerName: string): void {
     this.connect(code.trim().toUpperCase(), playerName);
+    if (this.status === 'error') return;
     this.status = 'connecting';
+    // Nothing tells us a hole punch failed — the room simply stays quiet — so treat silence as
+    // failure and say what usually causes it, rather than spinning under "Connecting…" forever.
+    this.joinTimer = setTimeout(() => {
+      if (this.status !== 'connecting') return;
+      const code = this.code;
+      this.leave();
+      this.code = code;
+      this.status = 'error';
+      this.error =
+        `No answer from room ${code}. Either nobody is hosting it right now, or the two ` +
+        `browsers cannot reach each other: mobile networks and office firewalls often block the ` +
+        `direct connection this game needs. Hosting from a home connection usually works.`;
+    }, JOIN_TIMEOUT_MS);
   }
 
   private connect(code: string, playerName: string): void {
@@ -218,6 +240,7 @@ class Online {
     };
     lobby.onMessage = (d, { peerId }) => {
       if (d.host !== peerId) return; // only the host owns the lobby
+      this.joined();
       this.lobby = d;
       if (this.status === 'connecting') this.status = 'lobby';
     };
@@ -234,6 +257,7 @@ class Online {
     };
     start.onMessage = (d, { peerId }) => {
       if (d.lobby.host !== peerId) return;
+      this.joined();
       this.lobby = d.lobby;
       this.status = 'playing';
       this.syncSettled();
@@ -242,6 +266,7 @@ class Online {
     };
     sync.onMessage = (d, { peerId }) => {
       if (d.lobby.host !== peerId) return;
+      this.joined();
       this.lobby = d.lobby;
       this.status = 'playing';
       this.syncSettled();
@@ -275,7 +300,14 @@ class Online {
     };
   }
 
+  /** the host has answered, so the join worked — stop the give-up timer */
+  private joined(): void {
+    if (this.joinTimer) clearTimeout(this.joinTimer);
+    this.joinTimer = null;
+  }
+
   leave(): void {
+    this.joined();
     this.syncSettled();
     this.room?.leave();
     this.room = null;
