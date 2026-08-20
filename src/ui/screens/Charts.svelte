@@ -11,6 +11,7 @@
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
 
   const s = $derived(game.s);
   const co = $derived(game.co);
@@ -36,7 +37,14 @@
 
   <div class="picker">
     {#each s.planets as p, i (p.id)}
-      <button class:on={i === t} class:home={i === co.planet} onclick={() => (target = i)}>
+      <button
+        class:on={i === t}
+        class:home={i === co.planet}
+        onclick={() => {
+          play('ping');
+          target = i;
+        }}
+      >
         {PLANET_BY_ID[p.id].name}
       </button>
     {/each}

@@ -11,6 +11,7 @@
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
   import { shortcuts } from '../shortcuts.svelte';
 
   const co = $derived(game.co);
@@ -55,6 +56,10 @@
     game.dispatch({ type: 'buy', commodity: c, tons: n });
   }
 
+  function select(c: CommodityId) {
+    play('click');
+    open(c);
+  }
   function open(c: CommodityId) {
     sel = c;
     qty = Math.max(1, maxBuy(c) > 0 ? maxBuy(c) : maxSell(c));
@@ -104,7 +109,7 @@
           {@const range = priceRange(def, levelOf(game.s).difficulty)}
           <tr
             class:sel={sel === c}
-            onclick={() => (quick ? quickTrade(c) : open(c))}
+            onclick={() => (quick ? quickTrade(c) : select(c))}
             oncontextmenu={(e) => {
               e.preventDefault();
               open(c);

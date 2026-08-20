@@ -10,6 +10,7 @@
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
+  import { play } from '../sound';
   import { shortcuts } from '../shortcuts.svelte';
   const s = $derived(game.s);
   const co = $derived(game.co);
@@ -30,6 +31,11 @@
    * Leave for `to`. Quick Deposit banks the cash first, so it earns interest in flight; the
    * deposit is a normal action, so it is logged and replayed like any other.
    */
+  /** clicking a world puts it under the crosshair before you commit to the burn */
+  function pickTarget(to: number) {
+    play('ping');
+    confirm = to;
+  }
   function depart(to: number) {
     confirm = null;
     if (shortcuts.on(co.id, 'deposit') && co.cash > 0) {
@@ -51,7 +57,7 @@
       style:top={`${pt.y}px`}
       onmouseenter={() => (hover = i)}
       onmouseleave={() => (hover = null)}
-      onclick={() => !here && (shortcuts.on(co.id, 'travel') ? depart(i) : (confirm = i))}
+      onclick={() => !here && (shortcuts.on(co.id, 'travel') ? depart(i) : pickTarget(i))}
       oncontextmenu={(e) => {
         e.preventDefault();
         if (!here) confirm = i;
