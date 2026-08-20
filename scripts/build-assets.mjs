@@ -21,6 +21,8 @@ const SRC_GFX = path.join(ROOT, 'assets/src/gfx');
 const SRC_SFX = path.join(ROOT, 'assets/src/sfx');
 const OUT = path.join(ROOT, 'public/assets');
 const CHECK = process.argv.includes('--check');
+/** every shipped sound effect is peak-normalised to this level */
+const PEAK_TARGET_DB = -3;
 
 /** target sizes by id pattern (first match wins) */
 const SPEC = [
@@ -85,6 +87,31 @@ async function buildGfx() {
   return stems.sort();
 }
 
+/** loudest peak in the file, in dBFS (0 when ffmpeg will not say) */
+function peakDb(file) {
+  const r = spawnSync(
+    'ffmpeg',
+    ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'],
+    {
+      encoding: 'utf8',
+    },
+  );
+  const m = /max_volume: (-?[\d.]+) dB/.exec(r.stderr ?? '');
+  return m ? Number(m[1]) : 0;
+}
+
+/** encode one master to the shipped mono OGG with `gain` dB applied; false when ffmpeg fails */
+function encode(src, dest, gain) {
+  const r = spawnSync(
+    'ffmpeg',
+    // prettier-ignore
+    ['-y', '-loglevel', 'error', '-i', src, '-ac', '1', '-ar', '22050',
+     '-af', `volume=${gain.toFixed(2)}dB`, '-c:a', 'libvorbis', '-q:a', '2', dest],
+    { stdio: 'inherit' },
+  );
+  return r.status === 0;
+}
+
 async function buildSfx() {
   const files = await walk(SRC_SFX, ['.wav', '.ogg', '.mp3', '.flac']);
   const stems = [];
@@ -93,27 +120,19 @@ async function buildSfx() {
     if (!CHECK) {
       const dest = path.join(OUT, 'sfx', `${stem}.ogg`);
       await fs.mkdir(path.dirname(dest), { recursive: true });
-      const r = spawnSync(
-        'ffmpeg',
-        [
-          '-y',
-          '-loglevel',
-          'error',
-          '-i',
-          f,
-          '-ac',
-          '1',
-          '-ar',
-          '22050',
-          '-c:a',
-          'libvorbis',
-          '-q:a',
-          '2',
-          dest,
-        ],
-        { stdio: 'inherit' },
-      );
-      if (r.status !== 0) {
+      // Masters come from different packs recorded at different levels; bring every peak to the
+      // same place so one sound is not startling next to another. Masters stay untouched.
+      //
+      // Resampling and lossy coding overshoot, by up to a few dB on sharp transients, so the
+      // encode is measured afterwards and corrected once. One pass is enough to land inside the
+      // tolerance for every sound we ship.
+      let gain = PEAK_TARGET_DB - peakDb(f);
+      let ok = encode(f, dest, gain);
+      if (ok) {
+        const off = PEAK_TARGET_DB - peakDb(dest);
+        if (Math.abs(off) > 0.5) ok = encode(f, dest, gain + off);
+      }
+      if (!ok) {
         console.warn(`ffmpeg failed for ${stem} (is ffmpeg installed?)`);
         continue;
       }
