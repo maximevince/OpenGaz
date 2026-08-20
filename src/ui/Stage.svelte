@@ -97,7 +97,8 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
+    /* the dev inspector docks on the right and reserves its width here; 0 in every real build */
+    width: calc(100% - var(--og-debug-dock, 0px));
     /* dvh follows the mobile toolbars as they collapse; vh is the desktop/legacy fallback */
     height: 100vh;
     height: 100dvh;
