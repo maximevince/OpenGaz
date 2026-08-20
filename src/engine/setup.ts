@@ -47,6 +47,8 @@ export function newGame(opts: NewGameOptions): GameState {
     settings: {
       level: level.id,
       ruleset,
+      // the tutorial ladder only runs on the Tutorial level; every other level starts open
+      tutorial: level.id === 'tutorial',
       targetNetWorth: initialWinningPoint(ruleset, 1_000_000),
     },
     week: 1,
@@ -55,6 +57,9 @@ export function newGame(opts: NewGameOptions): GameState {
     companies: [],
     order: [],
     turnIndex: 0,
+    tutorStage: 1,
+    tutorPending: level.id === 'tutorial',
+    tutorTaught: 0,
     phase: 'onPlanet',
     destination: null,
     pending: null,

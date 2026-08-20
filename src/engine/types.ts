@@ -4,7 +4,7 @@ import type { AiStyle } from './data/opponents';
 import type { PlanetId } from './data/planets';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** Rules whose original releases diverged in meaningful gameplay ways. */
 export type Ruleset = 'deluxe1997' | 'steam';
@@ -251,6 +251,8 @@ export interface AuctionResult {
 export interface GameSettings {
   level: Level;
   ruleset: Ruleset;
+  /** Tutorial level only: features arrive one at a time and their rules stay off until then. */
+  tutorial: boolean;
   /** The active win threshold. It increases when a player continues after winning. */
   targetNetWorth: number;
 }
@@ -292,6 +294,12 @@ export interface GameState {
     passTax: number; // % 0..50
     fuelPriceRange: number; // planet fuel price = fint(range, range*10)
   };
+  /** how far up the tutorial ladder this game has climbed (1..17); irrelevant once off */
+  tutorStage: number;
+  /** the current player is owed this week's lesson before the main menu opens */
+  tutorPending: boolean;
+  /** highest stage whose lesson has actually been read — a re-show is a short recap */
+  tutorTaught: number;
   /** weekly news / weather state */
   news: number; // 1..124 (or 1000..1003 stock stories)
   newsData: number; // 1..100 — the week's deterministic seed
@@ -328,7 +336,9 @@ export type Action =
   | { type: 'retireCompetition' }
   | { type: 'special' } // use this planet's special institution
   | { type: 'eventChoice'; choice: string; amount?: number }
-  | { type: 'continue' }; // dismiss arrival reports -> next company
+  | { type: 'continue' } // dismiss arrival reports -> next company
+  | { type: 'tutorialContinue' } // dismiss this week's lesson
+  | { type: 'tutorialAdvance' }; // "Add New Feature" — solo player takes the next stage early
 
 export type ActionType = Action['type'];
 

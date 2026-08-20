@@ -36,6 +36,9 @@ import {
   serialize,
   stepStockMarket,
   subtractCash,
+  unlocked,
+  FEATURE_STAGE,
+  FINAL_STAGE,
   type CompanyState,
   type GameState,
 } from './index';
@@ -601,6 +604,154 @@ describe('company status and history', () => {
     for (const c of s.companies) {
       for (const v of c.netWorthHistory) expect(v).toBeGreaterThan(-10_000_000_000);
     }
+  });
+});
+
+describe('tutorial', () => {
+  const tut = (over = {}) => base({ level: 'tutorial', ...over });
+  /** play the current human's week out until the week number moves on */
+  const runWeek = (start: GameState): GameState => {
+    let s = start;
+    const w = s.week;
+    for (let guard = 0; guard < 40 && s.week === w; guard++) {
+      if (s.tutorPending) s = applyAction(s, { type: 'tutorialContinue' });
+      else if (s.pending)
+        s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+      else if (s.phase === 'arrival') s = applyAction(s, { type: 'continue' });
+      else if (s.phase === 'onPlanet')
+        s = applyAction(s, { type: 'journey', to: (currentCompany(s).planet + 1) % 7 });
+      else break;
+    }
+    return s;
+  };
+
+  it('only runs on the tutorial level', () => {
+    expect(base({ level: 'novice' }).settings.tutorial).toBe(false);
+    expect(tut().settings.tutorial).toBe(true);
+    expect(tut().tutorStage).toBe(1);
+  });
+
+  it('gates a feature until its stage', () => {
+    const s = tut();
+    expect(unlocked(s, 'market')).toBe(true);
+    expect(unlocked(s, 'zinn')).toBe(false);
+    expect(unlocked(s, 'stock')).toBe(false);
+    // every other level has everything open from week 1
+    const open = base({ level: 'novice' });
+    for (const f of Object.keys(FEATURE_STAGE) as (keyof typeof FEATURE_STAGE)[]) {
+      expect(unlocked(open, f)).toBe(true);
+    }
+  });
+
+  it('follows the opening timetable and leaves weeks 2 and 5 quiet', () => {
+    let s = tut();
+    s.companies[0]!.ship.fuel = 9999;
+    const seen: [number, number, boolean][] = [];
+    for (let i = 0; i < 8; i++) {
+      seen.push([s.week, s.tutorStage, s.tutorPending]);
+      s = runWeek(s);
+      s.companies[0]!.ship.fuel = 9999;
+    }
+    const stageAt = (w: number) => seen.find(([week]) => week === w)?.[1];
+    expect(stageAt(1)).toBe(1);
+    expect(stageAt(3)).toBe(2);
+    expect(stageAt(4)).toBe(3);
+    expect(stageAt(6)).toBe(4);
+    expect(stageAt(7)).toBe(5);
+    expect(stageAt(8)).toBe(6);
+    // the rest weeks add nothing and ask for nothing
+    expect(seen.find(([week]) => week === 2)?.[2]).toBe(false);
+    expect(seen.find(([week]) => week === 5)?.[2]).toBe(false);
+  });
+
+  it('refuses to act while the lesson is unread', () => {
+    const s = tut();
+    expect(s.tutorPending).toBe(true);
+    expect(() => applyAction(s, { type: 'journey', to: 3 })).toThrow(/lesson/);
+    const read = applyAction(s, { type: 'tutorialContinue' });
+    expect(read.tutorPending).toBe(false);
+    expect(() => applyAction(read, { type: 'journey', to: 3 })).not.toThrow();
+  });
+
+  it('lets a solo player take features early, but not before stage 7', () => {
+    let s = tut();
+    s = applyAction(s, { type: 'tutorialContinue' });
+    expect(() => applyAction(s, { type: 'tutorialAdvance' })).toThrow(/schedule/);
+    s.tutorStage = 8;
+    const next = applyAction(s, { type: 'tutorialAdvance' });
+    expect(next.tutorStage).toBe(9);
+    expect(next.tutorPending).toBe(true); // the new feature gets its own lesson
+  });
+
+  it('hands a shared game one feature per week instead of a button', () => {
+    let s = tut({
+      humans: [
+        { name: 'A', ship: 1 },
+        { name: 'B', ship: 1 },
+      ],
+    });
+    s.tutorStage = 8;
+    expect(() => applyAction(s, { type: 'tutorialAdvance' })).toThrow(/shared game/);
+    for (const c of s.companies) c.ship.fuel = 9999;
+    const before = s.tutorStage;
+    s = runWeek(s);
+    expect(s.tutorStage).toBe(before + 1);
+  });
+
+  it('retires once the last lesson has been read', () => {
+    let s = tut();
+    s.tutorStage = FINAL_STAGE;
+    s.tutorPending = true;
+    expect(s.settings.tutorial).toBe(true);
+    expect(unlocked(s, 'stock')).toBe(true);
+    s = applyAction(s, { type: 'tutorialContinue' });
+    expect(s.settings.tutorial).toBe(false);
+    expect(s.tutorPending).toBe(false);
+  });
+
+  it('charges nothing for a system that has not been introduced', () => {
+    let s = tut();
+    const before = structuredClone(s.companies[0]!);
+    s = applyAction(s, { type: 'tutorialContinue' });
+    s = applyAction(s, { type: 'journey', to: (before.planet + 1) % 7 });
+    while (s.pending)
+      s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+    const after = s.companies[0]!;
+    // fuel burn, wages and every kind of interest wait for their own stage
+    expect(after.ship.fuel).toBe(before.ship.fuel);
+    expect(after.wagesOwed).toBe(0);
+    expect(after.zinnLoan).toBe(before.zinnLoan);
+    expect(after.unionLoan).toBe(before.unionLoan);
+    expect(after.taxOwedTariff).toBe(0);
+
+    // the same departure on a normal level charges all of it
+    let n = base({ level: 'novice' });
+    const nb = structuredClone(n.companies[0]!);
+    n = applyAction(n, { type: 'journey', to: (nb.planet + 1) % 7 });
+    while (n.pending)
+      n = applyAction(n, { type: 'eventChoice', choice: n.pending.choices[0]?.id ?? 'ok' });
+    const na = n.companies[0]!;
+    expect(na.ship.fuel).toBeLessThan(nb.ship.fuel);
+    expect(na.wagesOwed).toBeGreaterThan(0);
+    expect(na.zinnLoan).toBeGreaterThan(nb.zinnLoan);
+  });
+
+  it('keeps the rules behind a locked feature switched off', () => {
+    const s = tut();
+    // passenger tax is stage 11: boarding before then must not accrue any
+    const early = applyAction(applyAction(s, { type: 'tutorialContinue' }), {
+      type: 'pickupPassengers',
+    });
+    expect(early.companies[0]!.taxOwedPassenger).toBe(0);
+
+    const late = structuredClone(s);
+    late.tutorStage = FEATURE_STAGE.tax;
+    late.companies[0]!.paxWaiting = 4;
+    late.companies[0]!.paxPrice = 5000;
+    const taxed = applyAction(applyAction(late, { type: 'tutorialContinue' }), {
+      type: 'pickupPassengers',
+    });
+    expect(taxed.companies[0]!.taxOwedPassenger).toBeGreaterThan(0);
   });
 });
 
