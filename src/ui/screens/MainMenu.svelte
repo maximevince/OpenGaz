@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PLANET_BY_ID, cargoTons } from '../../engine';
+  import { PLANET_BY_ID, cargoTons, unlocked, type Feature } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import SoundToggle from '../components/SoundToggle.svelte';
@@ -21,6 +21,8 @@
     shortcuts.on(co.id, flag) ? runQuick(flag) : game.go(screen);
   /** the little mark that says "this button acts instead of opening a screen" */
   const bolt = (flag: QuickFlag) => (shortcuts.on(co.id, flag) ? ' ⚡' : '');
+  /** During the tutorial a feature's button is simply absent until its lesson has been given. */
+  const has = (f: Feature) => unlocked(game.s, f);
 </script>
 
 <div class="menu">
@@ -30,15 +32,23 @@
       {#if !surface}<div class="planet-ph">{def.name}</div>{/if}
       <button class="journey" onclick={() => game.go('map')}>Journey (Leave {def.name})</button>
     </div>
-    <Btn color="blue" onclick={() => game.go('stock')}>Stock Market</Btn>
+    {#if has('stock')}
+      <Btn color="blue" onclick={() => game.go('stock')}>Stock Market</Btn>
+    {/if}
     <Btn color="blue" onclick={() => game.go('money')}>Money: {fmt(co.cash)} cash</Btn>
-    <Btn color="blue" onclick={() => act('bank', 'bank')} oncontextmenu={() => game.go('bank')}
-      >Bank: {fmt(co.bank)}{bolt('bank')}</Btn
-    >
-    <Btn color="blue" onclick={() => act('loan', 'loan')} oncontextmenu={() => game.go('loan')}
-      >Loan: {fmt(co.unionLoan)}{bolt('loan')}</Btn
-    >
-    <Btn color="blue" onclick={() => game.go('zinn')}>Zinn's Loan: {fmt(co.zinnLoan)}</Btn>
+    {#if has('bank')}
+      <Btn color="blue" onclick={() => act('bank', 'bank')} oncontextmenu={() => game.go('bank')}
+        >Bank: {fmt(co.bank)}{bolt('bank')}</Btn
+      >
+    {/if}
+    {#if has('loan')}
+      <Btn color="blue" onclick={() => act('loan', 'loan')} oncontextmenu={() => game.go('loan')}
+        >Loan: {fmt(co.unionLoan)}{bolt('loan')}</Btn
+      >
+    {/if}
+    {#if has('zinn')}
+      <Btn color="blue" onclick={() => game.go('zinn')}>Zinn's Loan: {fmt(co.zinnLoan)}</Btn>
+    {/if}
   </div>
 
   <!-- centre column -->
@@ -48,64 +58,95 @@
       <Btn color="blue" onclick={() => game.go('market')}
         ><span class="big">🛒</span>Marketplace</Btn
       >
-      <Btn color="blue" onclick={() => game.go('supply')}><span class="big">%</span>Supply</Btn>
-      <Btn color="blue" onclick={() => game.go('warehouse')}
-        ><span class="big">🏭</span>Warehouse</Btn
-      >
+      {#if has('supply')}
+        <Btn color="blue" onclick={() => game.go('supply')}><span class="big">%</span>Supply</Btn>
+      {/if}
+      {#if has('warehouse')}
+        <Btn color="blue" onclick={() => game.go('warehouse')}
+          ><span class="big">🏭</span>Warehouse</Btn
+        >
+      {/if}
     </div>
-    <Btn
-      color="green"
-      onclick={() => act('passengers', 'passengers')}
-      oncontextmenu={() => game.go('passengers')}
-    >
-      Pickup Passengers: {co.paxPickedUp ? `${co.passengers} aboard` : co.paxWaiting}{bolt(
-        'passengers',
-      )}
-    </Btn>
-    <Btn
-      color="green"
-      onclick={() => act('advertising', 'advertise')}
-      oncontextmenu={() => game.go('advertise')}>Advertise for Next Planet{bolt('advertising')}</Btn
-    >
-    <Btn color="green" onclick={() => act('crew', 'crew')} oncontextmenu={() => game.go('crew')}>
-      Crew Wages Owed: {fmt(co.wagesOwed)}{bolt('crew')}
-    </Btn>
-    <Btn color="green" onclick={() => act('tax', 'taxes')} oncontextmenu={() => game.go('taxes')}
-      >Taxes Owed: {fmt(taxes)}{bolt('tax')}</Btn
-    >
-    <Btn
-      color="green"
-      onclick={() => act('insurance', 'insurance')}
-      oncontextmenu={() => game.go('insurance')}
-    >
-      Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insuranceCost)}{bolt('insurance')}
-    </Btn>
-    <Btn
-      color="green"
-      onclick={() => act('explore', 'explore')}
-      oncontextmenu={() => game.go('explore')}>Explore Planet{bolt('explore')}</Btn
-    >
+    {#if has('passengers')}
+      <Btn
+        color="green"
+        onclick={() => act('passengers', 'passengers')}
+        oncontextmenu={() => game.go('passengers')}
+      >
+        Pickup Passengers: {co.paxPickedUp ? `${co.passengers} aboard` : co.paxWaiting}{bolt(
+          'passengers',
+        )}
+      </Btn>
+    {/if}
+    {#if has('advertising')}
+      <Btn
+        color="green"
+        onclick={() => act('advertising', 'advertise')}
+        oncontextmenu={() => game.go('advertise')}
+        >Advertise for Next Planet{bolt('advertising')}</Btn
+      >
+    {/if}
+    {#if has('crew')}
+      <Btn color="green" onclick={() => act('crew', 'crew')} oncontextmenu={() => game.go('crew')}>
+        Crew Wages Owed: {fmt(co.wagesOwed)}{bolt('crew')}
+      </Btn>
+    {:else}
+      <!-- the crew slot holds the way back to this week's lesson until wages are explained -->
+      <Btn color="green" onclick={() => game.go('tutorial')}>Getting Started</Btn>
+    {/if}
+    {#if has('tax')}
+      <Btn color="green" onclick={() => act('tax', 'taxes')} oncontextmenu={() => game.go('taxes')}
+        >Taxes Owed: {fmt(taxes)}{bolt('tax')}</Btn
+      >
+    {/if}
+    {#if has('insurance')}
+      <Btn
+        color="green"
+        onclick={() => act('insurance', 'insurance')}
+        oncontextmenu={() => game.go('insurance')}
+      >
+        Insurance/Cost: {co.insured ? 'Insured' : 'None'}/{fmt(co.insuranceCost)}{bolt('insurance')}
+      </Btn>
+    {/if}
+    {#if has('viewCity')}
+      <Btn
+        color="green"
+        onclick={() => act('explore', 'explore')}
+        oncontextmenu={() => game.go('explore')}
+        >{has('explore') ? 'Explore Planet' : 'View City'}{has('explore')
+          ? bolt('explore')
+          : ''}</Btn
+      >
+    {/if}
     <Btn color="green" onclick={() => game.go('file')}>File Options</Btn>
   </div>
 
   <!-- right column -->
   <div class="right">
-    <div class="fuelcost">Fuel Cost: {fmt(fuelCost)}</div>
-    <button
-      class="pump"
-      onclick={() => act('fuel', 'fuel')}
-      oncontextmenu={(e) => {
-        e.preventDefault();
-        game.go('fuel');
-      }}
-      title={shortcuts.on(co.id, 'fuel')
-        ? 'Fuel — click to fill the tank, right-click for the screen'
-        : 'Fuel'}>⛽{shortcuts.on(co.id, 'fuel') ? '⚡' : ''}</button
-    >
-    <div class="gauge" title="Fuel tank">
-      <div class="fill" style:height={`${Math.round(fuelPct * 100)}%`}></div>
-      <span class="gauge-label">Fuel Tank</span>
-    </div>
+    {#if has('fuel')}
+      <div class="fuelcost">Fuel Cost: {fmt(fuelCost)}</div>
+    {/if}
+    {#if has('fuel')}
+      <button
+        class="pump"
+        onclick={() => act('fuel', 'fuel')}
+        oncontextmenu={(e) => {
+          e.preventDefault();
+          game.go('fuel');
+        }}
+        title={shortcuts.on(co.id, 'fuel')
+          ? 'Fuel — click to fill the tank, right-click for the screen'
+          : 'Fuel'}>⛽{shortcuts.on(co.id, 'fuel') ? '⚡' : ''}</button
+      >
+    {/if}
+    {#if has('fuel')}
+      <div class="gauge" title="Fuel tank">
+        <div class="fill" style:height={`${Math.round(fuelPct * 100)}%`}></div>
+        <span class="gauge-label">Fuel Tank</span>
+      </div>
+    {:else}
+      <div class="spacer"></div>
+    {/if}
     <button class="help" onclick={() => game.help('menu')} title="Help">👆<br />Help</button>
     <div class="status">wk {game.s.week} · {cargoTons(co)}/{co.ship.cargo} t</div>
     <SoundToggle />
@@ -221,6 +262,10 @@
     cursor: pointer;
     width: 100%;
     padding: 4px 0;
+  }
+  /* keeps the help button and status line pinned low while the gauge is still locked away */
+  .spacer {
+    flex: 1;
   }
   .gauge {
     flex: 1;

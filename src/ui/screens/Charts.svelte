@@ -6,6 +6,7 @@
     facilityHoldings,
     humanTravelTime,
     planetName,
+    unlocked,
   } from '../../engine';
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
@@ -17,6 +18,10 @@
   let target = $state(-1);
   const t = $derived(target < 0 ? co.planet : target);
   let tab: 'distance' | 'facilities' = $state('distance');
+  const hasFacilities = $derived(unlocked(s, 'facility'));
+  $effect(() => {
+    if (!hasFacilities && tab === 'facilities') tab = 'distance';
+  });
 
   const holdings = $derived(facilityHoldings(s, t).filter((h) => h.count > 0));
   const owedHere = $derived(
@@ -111,7 +116,9 @@
   <div class="buttons">
     <Btn color="black" onclick={() => game.go('map')}>Back to Map</Btn>
     <Btn color="black" onclick={() => (tab = 'distance')}>Distances</Btn>
-    <Btn color="black" onclick={() => (tab = 'facilities')}>Facilities</Btn>
+    {#if hasFacilities}
+      <Btn color="black" onclick={() => (tab = 'facilities')}>Facilities</Btn>
+    {/if}
     <Btn color="black" onclick={() => game.help()}>Help</Btn>
   </div>
 </div>

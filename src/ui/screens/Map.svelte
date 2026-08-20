@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { MAP_SLOTS, PLANET_BY_ID, distanceBetween, humanTravelTime } from '../../engine';
+  import {
+    MAP_SLOTS,
+    PLANET_BY_ID,
+    distanceBetween,
+    humanTravelTime,
+    unlocked,
+  } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
@@ -74,8 +80,12 @@
   </div>
   <div class="buttons">
     <Btn color="black" onclick={() => game.go('menu')}>Return to Main Menu</Btn>
-    <Btn color="black" onclick={() => game.go('supply')}>Supply Chart</Btn>
-    <Btn color="black" onclick={() => game.go('charts')}>Distances &amp; Facilities</Btn>
+    {#if unlocked(s, 'supply')}
+      <Btn color="black" onclick={() => game.go('supply')}>Supply Chart</Btn>
+    {/if}
+    {#if unlocked(s, 'distance')}
+      <Btn color="black" onclick={() => game.go('charts')}>Distances &amp; Facilities</Btn>
+    {/if}
     <Btn color="black" onclick={() => game.help()}>Help</Btn>
   </div>
 
