@@ -47,11 +47,20 @@
   const maxY = $derived(Math.max(100000, ...all));
   const y = (v: number) => H - PB - ((v - minY) / (maxY - minY)) * (H - PB - 10);
   const shipPic = $derived(img(`ship.${co.ship.defId}.picture`));
-  /** rival card art; humans have no portrait of their own */
+  /**
+   * Rival card art. These are the original's landscape creature cards — a whole creature on
+   * black, 320x200 — not busts, so the frame they hang in has to be landscape too.
+   */
   const faceOf = (c: (typeof s.companies)[number]) =>
     c.isAI ? (img(`portrait.op${c.aiIndex}`) ?? null) : null;
-  const BLANK =
-    'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221%22 height=%221%22/%3E';
+  /** the original had art for the six rivals only, so a human company gets its monogram */
+  const monogram = (name: string) =>
+    name
+      .split(/[^A-Za-z0-9]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join('') || '?';
 
   // net-worth bars use the recorded figure, so they agree with the history line's last point
   const bars = $derived(s.companies.map((c, i) => ({ c, i, v: atWeekStart(c) })));
@@ -209,14 +218,19 @@
     {:else if tab === 'players'}
       <div class="players">
         {#each s.companies as c, i (c.id)}
+          {@const face = faceOf(c)}
           <div class="pl" class:bust={c.bankrupt} style:border-color={colors[i % colors.length]}>
-            <img
-              class="face"
-              class:empty={!faceOf(c)}
-              src={faceOf(c) ?? BLANK}
-              alt=""
-              style:border-color={colors[i % colors.length]}
-            />
+            {#if face}
+              <img class="face" src={face} alt="" style:border-color={colors[i % colors.length]} />
+            {:else}
+              <div
+                class="face mono"
+                style:border-color={colors[i % colors.length]}
+                style:background={colors[i % colors.length]}
+              >
+                {monogram(c.name)}
+              </div>
+            {/if}
             <div class="who">
               <b>{c.name}</b>
               <span class="tag">{c.isAI ? c.aiStyle : 'human'}</span>
@@ -409,16 +423,22 @@
   .pl.bust {
     opacity: 0.55;
   }
+  /* the rival cards are 320x200: a landscape frame, and contain so nothing is cropped away */
   .face {
-    width: 44px;
-    height: 56px;
-    object-fit: cover;
+    width: 88px;
+    height: 55px;
+    object-fit: contain;
     border: 2px solid;
-    background: var(--c-navy);
+    background: #000;
     flex: none;
   }
-  .face.empty {
-    background: radial-gradient(circle at 50% 35%, #6060c0, #202060 70%);
+  .face.mono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font: bold 22px/1 var(--font-ui);
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
   }
   .who {
     display: flex;
