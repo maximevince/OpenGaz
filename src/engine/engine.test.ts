@@ -16,6 +16,7 @@ import {
   badChainStreak,
   cargoTons,
   companyLocation,
+  companyStatus,
   computePassengers,
   currentCompany,
   currentIndex,
@@ -545,6 +546,61 @@ describe('facilities and locations', () => {
     expect(rows[1]).toEqual({ company: 1, count: 2, fee: 800, revenue: 200 });
     expect(rows[0]!.count).toBe(0);
     expect(rows.reduce((a, h) => a + h.count, 0)).toBe(2);
+  });
+});
+
+describe('company status and history', () => {
+  it('steps the status ladder every 50,000 kubars, clamped at both ends', () => {
+    expect(companyStatus(0)).toBe('Struggling');
+    expect(companyStatus(49_999)).toBe('Struggling');
+    expect(companyStatus(50_000)).not.toBe('Struggling');
+    // everyone starts in debt to Mr. Zinn, so the opening status is below zero
+    expect(companyStatus(-110_000)).not.toBe('Struggling');
+    // the ladder runs -10..20 and clamps rather than falling off either end
+    expect(companyStatus(-500_000_000)).toBe(companyStatus(-500_000));
+    expect(companyStatus(5_000_000_000)).toBe(companyStatus(1_000_000));
+    // and every rung in between resolves to something
+    for (let v = -600_000; v <= 1_100_000; v += 50_000) {
+      expect(typeof companyStatus(v)).toBe('string');
+      expect(companyStatus(v).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('records a flat zero for a bankrupt company rather than the ranking sentinel', () => {
+    let s = base({
+      humans: [
+        { name: 'A', ship: 1 },
+        { name: 'B', ship: 1 },
+      ],
+      ai: 1,
+    });
+    // push whoever is up first past Mr Zinn's limit, then have them refuse to settle
+    const ci = currentIndex(s);
+    s.companies[ci]!.zinnLoan = s.companies[ci]!.zinnLimit + 1;
+    s = applyAction(s, { type: 'journey', to: (s.companies[ci]!.planet + 1) % 7 });
+    expect(s.pending?.id).toBe('gate:zinn');
+    s = applyAction(s, { type: 'eventChoice', choice: 'no' });
+    expect(s.companies[ci]!.bankrupt).toBe(true);
+    expect(netWorth(s, s.companies[ci]!)).toBe(-10_000_000_000);
+
+    // run the survivor's turn so the week rolls over and history is recorded
+    const before = s.companies[ci]!.netWorthHistory.length;
+    for (let guard = 0; guard < 20 && s.week === 1; guard++) {
+      if (s.pending) {
+        s = applyAction(s, { type: 'eventChoice', choice: s.pending.choices[0]?.id ?? 'ok' });
+      } else if (s.phase === 'arrival') {
+        s = applyAction(s, { type: 'continue' });
+      } else if (s.phase === 'onPlanet') {
+        s = applyAction(s, { type: 'journey', to: (currentCompany(s).planet + 2) % 7 });
+      } else break;
+    }
+    expect(s.week).toBe(2);
+    expect(s.companies[ci]!.netWorthHistory.length).toBe(before + 1);
+    expect(s.companies[ci]!.netWorthHistory.at(-1)).toBe(0);
+    // nothing anywhere in any ring may carry the sentinel, or every chart flattens
+    for (const c of s.companies) {
+      for (const v of c.netWorthHistory) expect(v).toBeGreaterThan(-10_000_000_000);
+    }
   });
 });
 
