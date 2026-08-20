@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { STAGE_W, STAGE_H, fitScale, rotationHelps } from './stage';
+  import { installGuard } from './overflow-guard';
 
   /** Fixed 640×480 virtual stage, uniformly scaled to fit the visible viewport (letterboxed). */
   let { children }: { children: Snippet } = $props();
@@ -43,6 +44,13 @@
     return () => ro.disconnect();
   });
 
+  // dev watchdog: shout as soon as a screen pushes content off the stage (see overflow-guard.ts)
+  let stageEl = $state<HTMLDivElement>();
+  $effect(() => {
+    if (!import.meta.env.DEV || !stageEl) return;
+    return installGuard(stageEl);
+  });
+
   function toggleRotate() {
     wantRotate = !wantRotate;
     try {
@@ -56,6 +64,7 @@
 <div class="viewport">
   <div class="field" bind:this={field}>
     <div
+      bind:this={stageEl}
       class="stage"
       style:width={`${STAGE_W}px`}
       style:height={`${STAGE_H}px`}

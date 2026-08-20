@@ -55,11 +55,36 @@ Developers who own the original CD may import its media into a local, git-ignore
 pnpm install
 pnpm dev          # http://localhost:5173
 pnpm test         # engine unit tests (vitest)
+pnpm test:layout  # drives every screen in a headless browser, fails on clipped content
 pnpm check        # svelte-check + tsc
 pnpm lint         # eslint + prettier
 pnpm build        # static site in dist/
 pnpm assets:build # assets/src masters -> public/assets pack (see docs/ASSETS.md)
 ```
+
+### The 640×480 stage
+
+Every screen is drawn on a fixed 640×480 stage that is scaled to the window and **clips
+whatever does not fit**, so a table with one row too many or a dialog that outgrows the
+stage silently takes its button row off screen. Neither `pnpm check` nor a unit test can
+see that — it only exists once a browser has laid the screen out.
+
+Two things keep it from happening:
+
+- `pnpm test:layout` (`scripts/layout-audit.mjs`, also a CI step) boots the dev server,
+  drives a headless Chromium through every screen — with the worst-case data we can force
+  into it, with the help dialog open, and at two window sizes — and fails on any element
+  that is cut off by an ancestor that clips without scrolling. **Add a scenario there when
+  you add a screen or a modal**; a scenario that cannot be set up is reported as a coverage
+  gap and fails too.
+- In `pnpm dev` the same check (`src/ui/overflow-guard.ts`) runs on every DOM change and
+  logs the offending elements to the console as soon as a screen overflows.
+
+The usual fix is to cap the container's height and let the long part scroll: `max-height`
+on the box, `overflow: auto; min-height: 0` on the list, `flex: none` on the header and
+button rows. Watch out for one trap: a percentage `max-height` on a **grid** item resolves
+against its own content and is silently dropped, so centre modals with flex, not
+`place-items: center`.
 
 Stack: TypeScript, Vite, Svelte 5, Vitest. Layout:
 

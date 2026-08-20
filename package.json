@@ -16,6 +16,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:layout": "node scripts/layout-audit.mjs",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "assets:build": "node scripts/build-assets.mjs",
