@@ -796,8 +796,10 @@ function endWeek(state: GameState, r: Rng): void {
   if (state.week > 4) opponentEvents(state, r); // (11)
 
   for (const co of state.companies) {
-    // (12) + (13): net worth is only recomputed here, and history is a 21-week ring
-    co.netWorthHistory.push(netWorth(state, co));
+    // (12) + (13): net worth is only recomputed here, and history is a 21-week ring.
+    // A bankrupt company records a flat 0, not the -10,000,000,000 the win check uses to
+    // rank it last — that sentinel in the history would flatten every chart drawn from it.
+    co.netWorthHistory.push(co.bankrupt ? 0 : netWorth(state, co));
     if (co.netWorthHistory.length > 21) co.netWorthHistory.shift();
   }
 

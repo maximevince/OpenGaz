@@ -127,6 +127,54 @@ export function netWorth(state: GameState, co: CompanyState): number {
   return Math.floor(shares + co.cash + co.bank - co.unionLoan - co.zinnLoan);
 }
 
+/**
+ * Company status ladder. One rung per 50,000 kubars of net worth, from ten rungs below zero
+ * to twenty above — so it moves all game rather than only near the goal, and everyone starts
+ * below "Struggling" because the ship is financed by Mr. Zinn.
+ */
+const STATUS_LADDER: readonly string[] = [
+  // -10 .. -1
+  'Penniless',
+  'Sinking',
+  'Underwater',
+  'In Arrears',
+  'Overdrawn',
+  'Hard Up',
+  'Pinched',
+  'Short',
+  'Wobbling',
+  'Behind',
+  // 0 .. 10
+  'Struggling',
+  'Getting By',
+  'Steady',
+  'Working',
+  'Careful',
+  'Busy',
+  'Solid',
+  'Comfortable',
+  'Doing Well',
+  'Handsome',
+  'Notable',
+  // 11 .. 20
+  'Flourishing',
+  'Enterprising',
+  'Prosperous',
+  'Thriving',
+  'Remarkable',
+  'Wealthy',
+  'Illustrious',
+  'Magnificent',
+  'Legendary',
+  'Supreme',
+];
+
+/** `floor(netWorth / 50,000)`, clamped to the ladder's -10..20 rungs. */
+export function companyStatus(netWorthNow: number): string {
+  const rung = Math.min(20, Math.max(-10, Math.floor(netWorthNow / 50_000)));
+  return STATUS_LADDER[rung + 10]!;
+}
+
 export function cargoTons(co: CompanyState): number {
   return Object.values(co.cargo).reduce((s, l) => s + (l?.tons ?? 0), 0);
 }

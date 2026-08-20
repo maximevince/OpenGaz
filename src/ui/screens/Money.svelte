@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { LEVEL_BY_ID, PLANET_BY_ID, SHIP_BY_ID, netWorth, sharesValue } from '../../engine';
+  import {
+    LEVEL_BY_ID,
+    PLANET_BY_ID,
+    SHIP_BY_ID,
+    companyLocation,
+    companyStatus,
+    netWorth,
+    sharesValue,
+  } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import Plate from '../components/Plate.svelte';
@@ -11,42 +19,74 @@
   const level = $derived(LEVEL_BY_ID(s.settings.level));
   const target = $derived(s.settings.targetNetWorth);
   let tab: 'summary' | 'history' | 'networth' | 'strength' | 'players' | 'ship' = $state('summary');
-  const alive = $derived(s.companies.map((c, i) => ({ c, i })).filter((x) => !x.c.bankrupt));
   const colors = ['#ff0000', '#00c000', '#0000ff', '#ff00ff', '#00c0c0', '#c0c000', '#ff8000'];
-  const status = $derived(
-    nw < 0
-      ? 'Struggling'
-      : nw < target * 0.1
-        ? 'Modest'
-        : nw < target * 0.4
-          ? 'Respectable'
-          : nw < target * 0.8
-            ? 'Formidable'
-            : 'Supreme',
-  );
+  const status = $derived(companyStatus(nw));
+  /** net worth as recorded at the week rollover — what the charts are drawn from */
+  const atWeekStart = (c: (typeof s.companies)[number]) =>
+    c.netWorthHistory[c.netWorthHistory.length - 1] ?? 0;
+  const nwStart = $derived(atWeekStart(co));
+
   // history chart
   const W = 600,
     H = 250,
     PL = 60,
     PB = 20;
-  const hist = $derived(s.companies.map((c) => c.netWorthHistory.slice(-20)));
+  /**
+   * Setup seeds the ring with a cosmetic opening value at index 0 so the bars have something
+   * to show in week 1. It is never plotted: until the ring wraps past week 20 the line starts
+   * at the first real weekly recording.
+   */
+  const hist = $derived(
+    s.companies.map((c) => (s.week <= 20 ? c.netWorthHistory.slice(1) : c.netWorthHistory)),
+  );
+  /** week 1 has a single real recording, so there is no line to draw yet */
+  const canPlot = $derived((hist[0]?.length ?? 0) > 1);
   const all = $derived(hist.flat());
   const minY = $derived(Math.min(0, ...all));
-  const maxAbs = $derived(Math.max(1, ...s.companies.map((c) => Math.abs(netWorth(s, c)))));
   const maxY = $derived(Math.max(100000, ...all));
   const y = (v: number) => H - PB - ((v - minY) / (maxY - minY)) * (H - PB - 10);
   const shipPic = $derived(img(`ship.${co.ship.defId}.picture`));
-  const strengthTotal = $derived(
-    alive.reduce((a, x) => a + x.c.ship.cargo + x.c.ship.seats * 10, 0),
-  );
+  /** rival card art; humans have no portrait of their own */
+  const faceOf = (c: (typeof s.companies)[number]) =>
+    c.isAI ? (img(`portrait.op${c.aiIndex}`) ?? null) : null;
+  const BLANK =
+    'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221%22 height=%221%22/%3E';
+
+  // net-worth bars use the recorded figure, so they agree with the history line's last point
+  const bars = $derived(s.companies.map((c, i) => ({ c, i, v: atWeekStart(c) })));
+  const maxAbs = $derived(Math.max(1, ...bars.map((b) => Math.abs(b.v))));
+
+  // market strength: share of the fleet's total mass, as a pie
+  const alive = $derived(s.companies.map((c, i) => ({ c, i })).filter((x) => !x.c.bankrupt));
+  const strengthTotal = $derived(alive.reduce((a, x) => a + x.c.ship.tons, 0));
+  const R = 92;
+  /** pie slices, each carrying the SVG path for its wedge */
+  const slices = $derived.by(() => {
+    let from = -Math.PI / 2;
+    return alive.map(({ c, i }) => {
+      const frac = c.ship.tons / Math.max(1, strengthTotal);
+      const to = from + frac * Math.PI * 2;
+      const p = (a: number) => `${(R * Math.cos(a)).toFixed(2)},${(R * Math.sin(a)).toFixed(2)}`;
+      // a single company owning the whole fleet cannot be drawn as an arc — draw a full circle
+      const d =
+        frac >= 0.999
+          ? `M 0,-${R} A ${R},${R} 0 1 1 -0.01,-${R} Z`
+          : `M 0,0 L ${p(from)} A ${R},${R} 0 ${to - from > Math.PI ? 1 : 0} 1 ${p(to)} Z`;
+      const mid = (from + to) / 2;
+      from = to;
+      return { c, i, frac, d, lx: R * 0.62 * Math.cos(mid), ly: R * 0.62 * Math.sin(mid) };
+    });
+  });
 </script>
 
 <div class="money">
   <div class="top">
     {#if tab === 'summary'}
       <div class="plates">
-        <Plate label="Net Worth:" value={fmt(nw)} color="yellow" />
+        <Plate label="Company:" value={co.name} color="yellow" />
         <Plate label="Game Level:" value={level.name} color="yellow" />
+        <Plate label="Net Worth (start of week):" value={fmt(nwStart)} color="yellow" />
+        <Plate label="Net Worth (right now):" value={fmt(nw)} color="yellow" />
         <Plate label="Company Status:" value={status} color="yellow" />
         <Plate label="Goal:" value={`${fmt(target)} net worth`} color="yellow" />
         <div class="breakdown">
@@ -84,13 +124,14 @@
       </svg>
       <div class="legend">
         {#each s.companies as c, i (c.id)}<span style:color={colors[i % colors.length]}
-            >■ {c.name}{c.bankrupt ? ' (bust)' : ''}</span
+            >■ {c.name}
+            {c.bankrupt ? '(bust)' : fmt(atWeekStart(c))}</span
           >{/each}
       </div>
     {:else if tab === 'networth'}
       <div class="bars">
-        {#each s.companies as c, i (c.id)}
-          {@const v = netWorth(s, c)}
+        <p class="note">Net worth as recorded at the start of week {s.week}.</p>
+        {#each bars as { c, i, v } (c.id)}
           <div class="barrow">
             <span class="bn">{c.name}</span>
             <div
@@ -105,29 +146,60 @@
         <div class="goal">goal: {fmt(target)}</div>
       </div>
     {:else if tab === 'strength'}
-      <div class="bars">
-        <p class="note">Market strength = share of total cargo &amp; passenger capacity.</p>
-        {#each alive as { c, i } (c.id)}
-          {@const v = (c.ship.cargo + c.ship.seats * 10) / strengthTotal}
-          <div class="barrow">
-            <span class="bn">{c.name}</span>
-            <div
-              class="bar"
-              style:width={`${v * 100}%`}
-              style:background={colors[i % colors.length]}
-            ></div>
-            <span class="bv">{Math.round(v * 100)}%</span>
-          </div>
-        {/each}
+      <div class="strength">
+        <svg class="pie" viewBox="-110 -110 220 220" role="img" aria-label="Market strength">
+          {#each slices as sl (sl.c.id)}
+            <path d={sl.d} fill={colors[sl.i % colors.length]} stroke="#000" stroke-width="1.5" />
+            {#if sl.frac > 0.07}
+              <text
+                x={sl.lx}
+                y={sl.ly}
+                font-size="12"
+                font-weight="bold"
+                fill="#fff"
+                text-anchor="middle"
+                dominant-baseline="middle">{Math.round(sl.frac * 100)}%</text
+              >
+            {/if}
+          {/each}
+        </svg>
+        <div class="pielegend">
+          <p class="note">
+            Market strength is each company's share of the fleet's total mass. Ships start at 400
+            tons; every enlargement won at auction adds 200.
+          </p>
+          {#each slices as sl (sl.c.id)}
+            <div class="prow">
+              <span class="swatch" style:background={colors[sl.i % colors.length]}></span>
+              <span class="bn">{sl.c.name}</span>
+              <span class="bv">{sl.c.ship.tons} t · {Math.round(sl.frac * 100)}%</span>
+            </div>
+          {/each}
+        </div>
       </div>
     {:else if tab === 'players'}
       <div class="players">
         {#each s.companies as c, i (c.id)}
-          <div class="pl" style:border-color={colors[i % colors.length]}>
-            <b>{c.name}</b>
-            {c.isAI ? `(computer, ${c.aiStyle})` : '(human)'}<br />
-            {SHIP_BY_ID(c.ship.defId).name} · on {PLANET_BY_ID[s.planets[c.planet]!.id].name} · net worth
-            {fmt(netWorth(s, c))}{c.bankrupt ? ' · BANKRUPT' : ''}
+          <div class="pl" class:bust={c.bankrupt} style:border-color={colors[i % colors.length]}>
+            <img
+              class="face"
+              class:empty={!faceOf(c)}
+              src={faceOf(c) ?? BLANK}
+              alt=""
+              style:border-color={colors[i % colors.length]}
+            />
+            <div class="who">
+              <b>{c.name}</b>
+              <span class="tag">{c.isAI ? c.aiStyle : 'human'}</span>
+              <span class="det">
+                {SHIP_BY_ID(c.ship.defId).name} · {c.ship.tons} t · on {PLANET_BY_ID[
+                  s.planets[companyLocation(s, i)]!.id
+                ].name}
+              </span>
+              <span class="det">
+                {c.bankrupt ? 'BANKRUPT' : `net worth ${fmt(netWorth(s, c))}`}
+              </span>
+            </div>
           </div>
         {/each}
       </div>
@@ -154,7 +226,7 @@
   </div>
   <div class="iconbar">
     <Btn color="cyan" onclick={() => game.go('menu')}>Continue</Btn>
-    <Btn color="cyan" onclick={() => (tab = 'history')}>Company History</Btn>
+    <Btn color="cyan" disabled={!canPlot} onclick={() => (tab = 'history')}>Company History</Btn>
     <Btn color="cyan" onclick={() => (tab = 'networth')}>Net Worth</Btn>
     <Btn color="cyan" onclick={() => (tab = 'strength')}>Market Strength</Btn>
     <Btn color="cyan" onclick={() => (tab = 'players')}>Players</Btn>
@@ -272,16 +344,77 @@
     margin: 0;
   }
   .players {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
+    padding: 8px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
-    font: 12px var(--font-ui);
+    align-content: start;
+    overflow: auto;
+    font: 11px var(--font-ui);
   }
   .pl {
     background: #fff;
     border-left: 8px solid;
-    padding: 4px 8px;
+    padding: 4px 6px;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .pl.bust {
+    opacity: 0.55;
+  }
+  .face {
+    width: 44px;
+    height: 56px;
+    object-fit: cover;
+    border: 2px solid;
+    background: var(--c-navy);
+    flex: none;
+  }
+  .face.empty {
+    background: radial-gradient(circle at 50% 35%, #6060c0, #202060 70%);
+  }
+  .who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .tag {
+    color: #505050;
+    font-style: italic;
+  }
+  .det {
+    color: #303030;
+  }
+  /* market strength */
+  .strength {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 10px;
+    padding: 10px;
+    align-items: center;
+    min-height: 0;
+  }
+  .pie {
+    width: 100%;
+    max-height: 240px;
+  }
+  .pielegend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font: bold 12px var(--font-ui);
+  }
+  .prow {
+    display: grid;
+    grid-template-columns: 16px 1fr 120px;
+    gap: 8px;
+    align-items: center;
+  }
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #000;
   }
   .iconbar {
     display: flex;
