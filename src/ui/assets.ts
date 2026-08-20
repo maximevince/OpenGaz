@@ -112,7 +112,43 @@ const originalGfx = (id: string): string | undefined => {
 
 // Recreated pack uses the semantic id directly as file path: `planet.bass.large` -> `planet/bass/large`.
 const opengazGfx = (id: string) => id.replace(/\./g, '/');
-const anySfx = (id: string) => id.replace(/^sfx\./, '');
+const opengazSfx = (id: string) => id.replace(/^sfx\./, '');
+
+/**
+ * Semantic sound id -> original file stem, for the dev-only pack. Most ids happen to match, so
+ * only the ones that differ are listed. Ids with no original equivalent (there was no click, no
+ * error buzz, no screen greeting for the market or the map) are absent and fall back to the
+ * synth — which is exactly what the sound-test screen shows.
+ */
+const SFX_MAP: Record<string, string> = {
+  ping: 'ping1',
+  select: 'ping3',
+  cash: 'coins',
+  rocket: 'rocket1',
+  'event.good': 'good',
+  'event.neutral': 'neutral',
+  'event.bad': 'bad',
+  'stock.crash': 'stokcrsh',
+  win: 'loro',
+  'commodity.cantaloupe': 'cantalou',
+  'commodity.jellybeans': 'jellybea',
+  'commodity.moonferns': 'moonfern',
+  'commodity.froglegs': 'frogleg',
+  'commodity.whipcream': 'whipcrem',
+  'commodity.babelseeds': 'babel',
+  'commodity.umbrellas': 'umbrella',
+  'commodity.polyester': 'polyestr',
+  'commodity.hairtonic': 'tonic',
+  'commodity.lavalamps': 'lavalamp',
+  'commodity.ogglesand': 'oggle',
+  'commodity.kryptoons': 'kryptoon',
+  'commodity.xfuels': 'xfuel',
+};
+
+const originalSfx = (id: string): string => {
+  const short = id.replace(/^sfx\./, '');
+  return SFX_MAP[short] ?? short.replace(/^commodity\./, '');
+};
 
 /* ---------- loading ------------------------------------------------------------------------ */
 
@@ -140,7 +176,7 @@ export async function initAssets(preferred?: PackName): Promise<PackName> {
     manifest: og,
     sfxExt: 'ogg',
     gfxId: opengazGfx,
-    sfxId: anySfx,
+    sfxId: opengazSfx,
   };
   active = fallback;
   if (preferred !== 'opengaz') {
@@ -152,7 +188,7 @@ export async function initAssets(preferred?: PackName): Promise<PackName> {
         manifest: orig,
         sfxExt: 'wav',
         gfxId: originalGfx,
-        sfxId: anySfx,
+        sfxId: originalSfx,
       };
     }
   }
