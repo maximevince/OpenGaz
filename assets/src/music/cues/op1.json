@@ -1,0 +1,20 @@
+{
+  "id": "op1",
+  "for": "rival theme, Gizzy Shipping",
+  "start": 2.0,
+  "seconds": 24,
+  "fadeIn": 0.3,
+  "fadeOut": 2.5,
+  "loudness": -16,
+  "highpass": 35,
+  "changes": "excerpted from 2s, faded, level-matched to −16 LUFS, re-encoded to Vorbis",
+  "credit": {
+    "work": "Brandenburg Concerto No. 3 in G major, BWV 1048 — I. Allegro (1721)",
+    "composer": "Johann Sebastian Bach (1685–1750)",
+    "performer": "Advent Chamber Orchestra",
+    "concert": "concert of December 2006",
+    "license": "EFF Open Audio License (interchangeable with CC BY-SA 2.0)",
+    "sourceUrl": "http://music.ibiblio.org/pub/multimedia/pandora/vorbis/index.html",
+    "fileUrl": "http://music.ibiblio.org/pub/multimedia/pandora/vorbis/chamber_orchestra/DEC-06/3Bach1.ogg"
+  }
+}

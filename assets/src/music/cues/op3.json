@@ -1,0 +1,23 @@
+{
+  "id": "op3",
+  "score": "opengaz-op3-drums-open.json",
+  "for": "rival theme, Vandergriff Ltd. — drum band, 16ths and flams, no melody",
+  "fromBeat": 0,
+  "bpm": 108,
+  "seconds": 24,
+  "fadeOut": 1.5,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 60
+    }
+  ]
+}
