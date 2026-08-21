@@ -39,9 +39,10 @@
 3. [x] Create the remaining Explore portraits: news, weather, clock, history, and the
        planet-special roles not covered by the core service set.
 4. [x] Add event portraits in themed batches and check that every portrait reads clearly in the
-       200×320 frame.
-5. Draw the last two referenced portraits that have no art yet: `ltech` (the L-Tech Engine Works
-   rep) and `sooth` (the soothsayer of Ooom). Both fall back to no picture today.
+       200×320 frame. All travel events now have an explicit portrait rather than a procedural
+       fallback.
+5. [x] Draw the last two referenced portraits that have no art yet: `ltech` (the L-Tech Engine
+       Works rep) and `sooth` (the soothsayer of Ooom).
 
 ## Acceptance checks for every batch
 

@@ -366,7 +366,7 @@ const GOOD: Record<number, TravelEventDef> = {
         14,
         'Money, Money, Money',
         'good',
-        undefined,
+        'bank',
         `A distant relative you never liked leaves you ${fmt(x)} kubars. You resolve to think of them more fondly.`,
       );
     },
@@ -380,7 +380,7 @@ const GOOD: Record<number, TravelEventDef> = {
         15,
         'Lottery!',
         'good',
-        undefined,
+        'pilot',
         `The ticket your pilot bought on a whim wins the Kukubian lottery: ${fmt(x)} kubars.`,
       );
     },
@@ -463,6 +463,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Curtonian Plus',
         text: `A Curtonian investment cooperative wants ${fmt(x)} kubars for a "guaranteed" sixfold return. Guaranteed by whom is unclear. Invest?`,
         choices: yn(),
+        portrait: 'curtonian',
         mood: 'good',
         data: { x },
       });
@@ -492,6 +493,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Quist',
         text: `A dazzling salesbeing called Quist offers you an exclusive stake in a hyperspace bypass for ${fmt(x)} kubars. The brochure is beautiful. Invest?`,
         choices: yn(),
+        portrait: 'quist',
         mood: 'good',
         data: { x },
       });
@@ -513,6 +515,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'The Wobbler',
         text: `The performance artist known as The Wobbler needs ${fmt(x)} kubars to finish a piece guaranteed to triple your money. Art is risk. Fund it?`,
         choices: yn(),
+        portrait: 'wobbler',
         mood: 'good',
         data: { x },
       });
@@ -540,6 +543,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Brow, Industrial Spy',
         text: `Brow the industrial spy offers to sabotage every rival company — for ${fmt(x)} kubars. Strictly off the books. Hire him?`,
         choices: yn(),
+        portrait: 'sabotage',
         mood: 'good',
         data: { x },
       });
@@ -572,6 +576,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Yoyo',
         text: `A grinning drifter called Yoyo bets you ${fmt(x)} kubars on a coin flip. His coin. Take the bet?`,
         choices: yn(),
+        portrait: 'yoyo',
         mood: 'good',
         data: { x },
       });
@@ -594,6 +599,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Limpus Charity',
         text: 'The Limpus Relief Fleet is collecting for flood victims. They would take your entire cargo. Karma, they note, is real. Donate everything?',
         choices: yn(),
+        portrait: 'limpus',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -611,6 +617,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Sleg Engine Trade',
         text: 'Sleg, a collector of fine engines, offers 150,000 kubars for three kuarps of yours. Your ship would crawl, but richly. Trade?',
         choices: yn(),
+        portrait: 'sleg',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -714,7 +721,7 @@ const GOOD: Record<number, TravelEventDef> = {
         30,
         'Tatilus',
         'good',
-        undefined,
+        'tatilus',
         `Tatilus, a tour operator in a hurry, pays 5,000 kubars per empty seat (${k} seats: ${fmt(5000 * k)} kubars) to fill your cabin with sightseers.`,
       );
     },
@@ -746,7 +753,7 @@ const GOOD: Record<number, TravelEventDef> = {
         32,
         'Lord 104',
         'good',
-        undefined,
+        'lord104',
         `Lord 104, a robot aristocrat with no concept of haggling, buys your entire cargo for triple what you paid: ${fmt(3 * v)} kubars.`,
       );
     },
@@ -759,6 +766,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Nectum',
         text: `Nectum the freighter captain, overloaded and overdue, offers ${f} tons of Exotic at 100 kubars a ton (${fmt(100 * f)} kubars). Take it?`,
         choices: yn(),
+        portrait: 'nectum',
         mood: 'good',
         data: { f },
       });
@@ -795,7 +803,7 @@ const GOOD: Record<number, TravelEventDef> = {
         34,
         'Squowk',
         'good',
-        undefined,
+        'squowk',
         `Squowk, an eccentric trader, swaps your entire cargo for a full hold of ${name} (${cap} tons). You are not sure who won.`,
       );
     },
@@ -811,7 +819,7 @@ const GOOD: Record<number, TravelEventDef> = {
         35,
         'Captain Leahy',
         'good',
-        undefined,
+        'leahy',
         `Captain Leahy, provisioning a colony fleet, buys your whole cargo at double cost: ${fmt(2 * v)} kubars.`,
       );
     },
@@ -823,7 +831,7 @@ const GOOD: Record<number, TravelEventDef> = {
         36,
         'Mulls',
         'neutral',
-        undefined,
+        'mulls',
         'Mulls, a retired trader with opinions, corners you on the comm for an hour of advice. Buy low, he says. Sell high. You thank him.',
       ),
   },
@@ -868,6 +876,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Meeg Automation',
         text: `Meeg Cybernetics offers to automate one crew station for ${fmt(x)} kubars — one less salary to pay, forever. Install it?`,
         choices: yn(),
+        portrait: 'meeg',
         mood: 'good',
         data: { x },
       });
@@ -897,6 +906,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Spike the Space Mutt',
         text: 'A stray space mutt is scratching at the airlock, all eyes and hope. The crew has already named him Spike. Take him in?',
         choices: yn(),
+        portrait: 'spike',
         mood: 'good',
         data: { x },
       });
@@ -963,7 +973,7 @@ const GOOD: Record<number, TravelEventDef> = {
           41,
           'Speevak',
           'bad',
-          undefined,
+          'police',
           `Speevak paid you ${fmt(x)} kubars to dump his "surplus" in deep space — and the Rangers caught you at it. Fined ${fmt(fine)} kubars and detained.${suffix}`,
         );
       } else {
@@ -972,7 +982,7 @@ const GOOD: Record<number, TravelEventDef> = {
           41,
           'Speevak',
           'good',
-          undefined,
+          'police',
           `Speevak paid you ${fmt(x)} kubars to quietly dispose of some barrels. You did not look inside.`,
         );
       }
@@ -985,6 +995,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Hapa Jillo',
         text: `Hapa Jillo, saboteur to the discreet, will arrange misfortune for every rival company — ${fmt(x)} kubars, cash. Interested?`,
         choices: yn(),
+        portrait: 'hapajillo',
         mood: 'good',
         data: { x },
       });
@@ -1031,6 +1042,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Snoz Lombardo',
         text: `Snoz Lombardo, impresario at large, offers a fat fee to divert your ship — he has a show to catch and money to burn. Take him aboard?`,
         choices: yn(),
+        portrait: 'snoz',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -1051,6 +1063,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Lady Shimmer',
         text: 'Lady Shimmer, radiant and stranded, asks for passage to another planet. She hints, glitteringly, at gratitude. Take her?',
         choices: yn(),
+        portrait: 'shimmer',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -1078,6 +1091,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Teal Tree',
         text: 'Teal Tree, a botanist with a deadline, offers a handsome fee for a detour to another planet. Accept?',
         choices: yn(),
+        portrait: 'tealtree',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -1098,6 +1112,7 @@ const GOOD: Record<number, TravelEventDef> = {
         title: 'Stubbs',
         text: 'Stubbs, a water merchant with a leaking hold, pays cash on the spot for your surplus water reserves. Sell?',
         choices: yn(),
+        portrait: 'warehouse',
         mood: 'good',
       }),
     resolve: (c, choice) => {
@@ -1404,7 +1419,7 @@ const BAD: Record<number, TravelEventDef> = {
           -12,
           'Rotten Cargo',
           'neutral',
-          undefined,
+          'insurance',
           `Half your ${name} turned out to be spoiled — but Voyager's Insurance makes you whole.`,
         );
       } else {
@@ -1416,7 +1431,7 @@ const BAD: Record<number, TravelEventDef> = {
           -12,
           'Rotten Cargo',
           'bad',
-          undefined,
+          'insurance',
           `${n} tons of your ${name} arrived rotten, defective or otherwise unsellable. Overboard it goes.`,
         );
       }
@@ -1520,7 +1535,7 @@ const BAD: Record<number, TravelEventDef> = {
           -16,
           'Cargo Disaster',
           'neutral',
-          undefined,
+          'insurance',
           "The cargo bay depressurised mid-flight. Voyager's Insurance covers every last ton; you lose only time.",
         );
       } else {
@@ -1530,7 +1545,7 @@ const BAD: Record<number, TravelEventDef> = {
           -16,
           'Cargo Disaster',
           'bad',
-          undefined,
+          'insurance',
           `The cargo bay depressurised mid-flight. All ${tons} tons of cargo are now a very expensive debris field.`,
         );
       }
