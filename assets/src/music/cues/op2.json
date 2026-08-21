@@ -1,0 +1,44 @@
+{
+  "id": "op2",
+  "score": "opengaz-op2-jazz.json",
+  "for": "rival theme, Trading Corp. IV — upright bass, vibraphone, tenor sax",
+  "fromBeat": 0,
+  "bpm": 132,
+  "seconds": 24,
+  "fadeOut": 1.5,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 32,
+      "velocity": 110,
+      "pan": 64,
+      "level": 1.25
+    },
+    {
+      "match": "piano",
+      "program": 11,
+      "velocity": 58,
+      "pan": 50,
+      "level": 0.78
+    },
+    {
+      "match": "trumpet",
+      "program": 66,
+      "velocity": 86,
+      "pan": 76,
+      "level": 0.92
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 34
+    }
+  ]
+}

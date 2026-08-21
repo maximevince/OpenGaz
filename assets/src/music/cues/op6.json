@@ -1,0 +1,20 @@
+{
+  "id": "op6",
+  "for": "rival theme, Hoff Meister",
+  "start": 2.1,
+  "seconds": 24,
+  "fadeIn": 0.3,
+  "fadeOut": 2.5,
+  "loudness": -16,
+  "highpass": 35,
+  "changes": "excerpted from 2.1s, faded, level-matched to −16 LUFS, re-encoded to Vorbis",
+  "credit": {
+    "work": "Totentanz, S. 126, for piano and orchestra (1849)",
+    "composer": "Franz Liszt (1811–1886)",
+    "performer": "Neal O'Doan, piano (orchestra unidentified in the source)",
+    "concert": "Pandora Music, Liszt/Strauss set",
+    "license": "EFF Open Audio License (interchangeable with CC BY-SA 2.0)",
+    "sourceUrl": "http://music.ibiblio.org/pub/multimedia/pandora/vorbis/index.html",
+    "fileUrl": "http://music.ibiblio.org/pub/multimedia/pandora/vorbis/piano/O_Doan/Liszt,Strauss/totentanz.ogg"
+  }
+}

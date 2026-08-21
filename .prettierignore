@@ -3,3 +3,6 @@ node_modules
 pnpm-lock.yaml
 public/original
 docs/reference
+
+# generated score masters: note data, written by scripts/music/extract_score.py
+assets/src/music/scores

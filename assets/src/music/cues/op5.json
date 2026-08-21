@@ -1,0 +1,35 @@
+{
+  "id": "op5",
+  "score": "opengaz-op5-groove.json",
+  "for": "rival theme, Roke Transport — E minor pentatonic bass riff, clavinet from bar two",
+  "fromBeat": 0,
+  "bpm": 123,
+  "seconds": 24,
+  "fadeOut": 1.5,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 33,
+      "velocity": 104,
+      "pan": 64
+    },
+    {
+      "match": "clav",
+      "program": 7,
+      "velocity": 74,
+      "pan": 72
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 25
+    }
+  ]
+}
