@@ -37,3 +37,7 @@ docs/DESIGN.md
 
 # local tooling scratch space (agent worktrees, session state)
 .claude/
+
+# music build cache (third-party source recordings, never committed)
+.cache/
+build/
