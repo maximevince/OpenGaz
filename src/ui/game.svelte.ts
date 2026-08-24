@@ -4,7 +4,7 @@
  */
 import { online } from '../net/online.svelte';
 import { play } from './sound';
-import { setTrack } from './music';
+import { setTrack, stopSting } from './music';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
@@ -149,15 +149,20 @@ class GameStore {
   }
 
   /**
-   * Music follows the planet you are standing on, and stops outside a game. Called on every
-   * screen and state change; `setTrack` ignores a repeat of what is already playing.
+   * Music follows the planet you are standing on, and stops outside a game.
+   *
+   * The original played a planet's theme on two screens only — the welcome screen and Explore —
+   * and was silent elsewhere. We keep it running underneath as a quiet bed and lift it to full on
+   * those same two screens. Called on every screen and state change; `setTrack` ignores a repeat.
    */
   cueMusic() {
+    stopSting();
     if (!this.state || this.screen === 'title' || this.screen === 'setup') {
       setTrack(null);
       return;
     }
-    setTrack(`planet.${this.planet.id}`);
+    const loud = this.screen === 'arrival' || this.screen === 'explore';
+    setTrack(`planet.${this.planet.id}`, loud ? 'full' : 'bed');
   }
 
   /** dismiss the weekly standings and route on to whatever comes next */

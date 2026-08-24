@@ -1,13 +1,28 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { PLANET_BY_ID } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
+  import { sting } from '../music';
   const s = $derived(game.s);
   const co = $derived(game.co);
   const p = $derived(game.planet);
   const large = $derived(img(`planet.${p.id}.large`));
   const news = $derived(s.log.filter((l) => l.company === -1 && l.week >= s.week - 1).slice(-3));
+
+  /** The rival a report is about, if any — the original played a company's theme with its card. */
+  const rival = $derived.by(() => {
+    for (const r of s.arrivalReports) {
+      const c = r.about === undefined ? undefined : s.companies[r.about];
+      if (c?.isAI && c.aiIndex > 0) return c;
+    }
+    return undefined;
+  });
+
+  onMount(() => {
+    if (rival) sting(`op${rival.aiIndex}`);
+  });
 </script>
 
 <div class="arr" style:background-image={large ? `url(${large})` : undefined}>
@@ -20,6 +35,10 @@
     {#each s.arrivalReports as r, i (i)}
       <div class="line {r.kind}">{r.text}</div>
     {/each}
+    {#if rival}
+      {@const face = img(`portrait.op${rival.aiIndex}`)}
+      {#if face}<img class="rival" src={face} alt={rival.name} />{/if}
+    {/if}
     {#if news.length}
       <div class="newshead">Kuku News</div>
       {#each news as n, i (i)}<div class="line news">{n.text}</div>{/each}
@@ -40,6 +59,13 @@
     gap: 8px;
     padding: 10px;
     box-sizing: border-box;
+  }
+  .rival {
+    align-self: flex-end;
+    width: 96px;
+    image-rendering: pixelated;
+    border: 2px solid;
+    border-color: #404040 #fff #fff #404040;
   }
   .welcome {
     font:
