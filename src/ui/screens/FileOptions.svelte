@@ -70,6 +70,7 @@
     {/if}
     {#if import.meta.env.DEV}
       <Btn onclick={() => game.go('soundtest')}>Sound test</Btn>
+      <Btn onclick={() => game.go('credits')}>Credits</Btn>
     {/if}
     <Btn
       onclick={() => {
