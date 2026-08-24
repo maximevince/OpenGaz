@@ -4,6 +4,7 @@
  */
 import { online } from '../net/online.svelte';
 import { play } from './sound';
+import { setTrack } from './music';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
@@ -48,6 +49,7 @@ export type Screen =
   | 'file'
   | 'shortcuts'
   | 'soundtest'
+  | 'credits'
   | 'map'
   | 'charts'
   | 'travel'
@@ -143,6 +145,19 @@ class GameStore {
     this.error = null;
     if (screen !== this.screen) play(SCREEN_SOUND[screen] ?? '', 0.7);
     this.screen = screen;
+    this.cueMusic();
+  }
+
+  /**
+   * Music follows the planet you are standing on, and stops outside a game. Called on every
+   * screen and state change; `setTrack` ignores a repeat of what is already playing.
+   */
+  cueMusic() {
+    if (!this.state || this.screen === 'title' || this.screen === 'setup') {
+      setTrack(null);
+      return;
+    }
+    setTrack(`planet.${this.planet.id}`);
   }
 
   /** dismiss the weekly standings and route on to whatever comes next */
@@ -196,6 +211,12 @@ class GameStore {
 
   /** Route to the right screen after the state changed, run AI turns, autosave. */
   private afterChange() {
+    this.route();
+    // after routing, not before: the music follows the screen this change lands on
+    this.cueMusic();
+  }
+
+  private route() {
     const s = this.s;
     if (s.phase === 'gameOver' || s.phase === 'winner') {
       this.state = s;

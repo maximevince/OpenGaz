@@ -19,6 +19,7 @@ export type PackName = 'opengaz' | 'original';
 interface Manifest {
   gfx: string[];
   sfx: string[];
+  music: string[];
 }
 
 interface Pack {
@@ -161,7 +162,7 @@ async function loadManifest(url: string): Promise<Manifest | undefined> {
     const r = await fetch(url, { cache: 'no-cache' });
     if (!r.ok) return undefined;
     const m = (await r.json()) as Partial<Manifest>;
-    return { gfx: m.gfx ?? [], sfx: m.sfx ?? [] };
+    return { gfx: m.gfx ?? [], sfx: m.sfx ?? [], music: m.music ?? [] };
   } catch {
     return undefined;
   }
@@ -169,7 +170,11 @@ async function loadManifest(url: string): Promise<Manifest | undefined> {
 
 /** Load packs. Prefers `original` when present (local dev) unless `preferred` says otherwise. */
 export async function initAssets(preferred?: PackName): Promise<PackName> {
-  const og = (await loadManifest(`${BASE}/assets/manifest.json`)) ?? { gfx: [], sfx: [] };
+  const og = (await loadManifest(`${BASE}/assets/manifest.json`)) ?? {
+    gfx: [],
+    sfx: [],
+    music: [],
+  };
   fallback = {
     name: 'opengaz',
     base: `${BASE}/assets`,
@@ -215,6 +220,19 @@ function resolve(kind: 'gfx' | 'sfx', id: string): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * URL for a music id (`planet.tilo`, `op3`), or undefined. Music lives only in the recreated
+ * pack, so this resolves against the fallback whichever pack is active — playing the shipped
+ * planet themes while the dev-only art pack is on is the useful behaviour, not a bug.
+ */
+export function music(id: string): string | undefined {
+  const pack = fallback ?? active;
+  return pack && pack.manifest.music.includes(id) ? `${pack.base}/music/${id}.ogg` : undefined;
+}
+
+/** Every music id the shipped pack carries. */
+export const musicIds = (): string[] => (fallback ?? active)?.manifest.music.slice() ?? [];
 
 /** URL for an image id: from the active pack, else the fallback pack, else procedural art. */
 export const img = (id: string) => resolve('gfx', id) ?? procImage(id);
