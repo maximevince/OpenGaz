@@ -1,7 +1,7 @@
 {
   "id": "planet.frac-clockwork",
   "score": "opengaz-frac-clockwork.json",
-  "for": "Frac — bright clockwork figure",
+  "for": "Frac — bright clockwork figure (alternate take, not shipped)",
   "fromBeat": 0,
   "bpm": 200,
   "seconds": 10,
@@ -25,5 +25,6 @@
       "pan": 64,
       "reverb": 60
     }
-  ]
+  ],
+  "build": false
 }

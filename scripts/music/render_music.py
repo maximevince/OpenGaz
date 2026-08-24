@@ -115,6 +115,10 @@ def run(cmd):
 
 def render(spec_path, out_dir, lofi=False):
     spec = json.load(open(spec_path))
+    if "score" not in spec:
+        return None          # a recording cue: cut_recording.py owns it
+    if spec.get("build") is False:
+        return None          # an alternate take, kept in the repo but not shipped
     score_path = os.path.join(os.path.dirname(spec_path), "..", "scores", spec["score"])
     score = json.load(open(score_path))
     os.makedirs(out_dir, exist_ok=True)
