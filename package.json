@@ -1,8 +1,8 @@
 {
   "name": "opengaz",
   "private": true,
-  "version": "0.4.0",
-  "description": "OpenGaz \u2014 an open-source homage to Gazillionaire Deluxe, playable in the browser (solo, hot-seat, online).",
+  "version": "0.5.0",
+  "description": "OpenGaz — an open-source homage to Gazillionaire Deluxe, playable in the browser (solo, hot-seat, online).",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
