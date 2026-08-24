@@ -12,7 +12,8 @@
   const p = $derived(game.planet);
   const def = $derived(PLANET_BY_ID[p.id]);
   const surface = $derived(img(`planet.${p.id}.surface`));
-  const fuelCost = $derived((co.ship.fuelCap - co.ship.fuel) * p.fuelPrice);
+  // the price of one ton, as the original's main menu showed — not the cost of a full tank
+  const fuelPrice = $derived(p.fuelPrice);
   const fuelPct = $derived(co.ship.fuel / co.ship.fuelCap);
   const taxes = $derived(co.taxOwedPassenger + co.taxOwedTariff);
 
@@ -124,7 +125,7 @@
   <!-- right column -->
   <div class="right">
     {#if has('fuel')}
-      <div class="fuelcost">Fuel Cost: {fmt(fuelCost)}</div>
+      <div class="fuelcost">Fuel Cost/ton: {fmt(fuelPrice)}</div>
     {/if}
     {#if has('fuel')}
       <button
