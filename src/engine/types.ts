@@ -175,6 +175,8 @@ export interface LogEntry {
   company: number; // -1 = world news
   kind: 'news' | 'event' | 'info' | 'warn' | 'good' | 'bad';
   text: string;
+  /** the company this entry is *about*, when that is someone other than its owner */
+  about?: number;
 }
 
 export interface PendingEvent {

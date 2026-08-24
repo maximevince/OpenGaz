@@ -102,6 +102,16 @@ function report(state: GameState, kind: LogEntry['kind'], text: string): void {
   state.arrivalReports.push(log(state, currentIndex(state), kind, text));
 }
 
+/**
+ * A report about somebody else — a rival landing before you, a rival winning the auction. The
+ * subject is carried so the UI can put that company's face and theme to the line.
+ */
+function reportAbout(state: GameState, about: number, kind: LogEntry['kind'], text: string): void {
+  const entry = log(state, currentIndex(state), kind, text);
+  entry.about = about;
+  state.arrivalReports.push(entry);
+}
+
 function need(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new ActionError(msg);
 }
@@ -696,7 +706,15 @@ function enterTurn(state: GameState): void {
   }
 
   const auctionNews = auctionReportFor(state, ci);
-  if (auctionNews) report(state, 'info', auctionNews);
+  if (auctionNews) {
+    const winner = state.auctionLast;
+    const byRival =
+      winner && winner.code > 0 && winner.highBid > 0 && winner.highCompany !== ci
+        ? winner.highCompany
+        : -1;
+    if (byRival >= 0) reportAbout(state, byRival, 'info', auctionNews);
+    else report(state, 'info', auctionNews);
+  }
 
   if (co.arrivalPending) {
     co.arrivalPending = false;
@@ -730,7 +748,12 @@ function reportNeighbours(state: GameState, co: CompanyState, ci: number): void 
         other.aiTag && other.aiCargo > 0
           ? `, holds full of ${fmt(other.aiCargo)} tons of ${COMMODITY_BY_ID[other.aiTag].name}`
           : ', holds empty';
-      report(state, 'info', `${other.name} is already parked on ${pname}${hold}. ${taunt}`);
+      reportAbout(
+        state,
+        oi,
+        'info',
+        `${other.name} is already parked on ${pname}${hold}. ${taunt}`,
+      );
     } else {
       report(
         state,
