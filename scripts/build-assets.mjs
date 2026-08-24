@@ -4,6 +4,7 @@
  *
  *   assets/src/gfx/<id path>.{png,jpg,webp}  ->  public/assets/gfx/<id path>.png  (resized to spec)
  *   assets/src/sfx/<id>.{wav,ogg,mp3}        ->  public/assets/sfx/<id>.ogg       (via ffmpeg)
+ *   public/assets/music/<id>.ogg              (rendered by scripts/music, indexed here)
  *   public/assets/manifest.json               (list of stems the UI may resolve)
  *
  * The id path is the semantic asset id with dots replaced by slashes, e.g.
@@ -123,13 +124,33 @@ async function buildSfx() {
   return stems.sort();
 }
 
+/**
+ * Music is not built here: `scripts/music/render_music.py` and `cut_recording.py` render it
+ * straight into `public/assets/music`, because it needs fluidsynth and a soundfont. This only
+ * indexes what they produced, so the UI can resolve a cue id.
+ */
+async function listMusic() {
+  try {
+    const files = await fs.readdir(path.join(OUT, 'music'));
+    return files
+      .filter((f) => f.endsWith('.ogg'))
+      .map((f) => f.slice(0, -'.ogg'.length))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 const gfx = await buildGfx();
 const sfx = await buildSfx();
+const music = await listMusic();
 if (!CHECK) {
   await fs.mkdir(OUT, { recursive: true });
   await fs.writeFile(
     path.join(OUT, 'manifest.json'),
-    JSON.stringify({ pack: 'opengaz', gfx, sfx }, null, 2) + '\n',
+    JSON.stringify({ pack: 'opengaz', gfx, sfx, music }, null, 2) + '\n',
   );
 }
-console.log(`${CHECK ? 'checked' : 'built'} ${gfx.length} gfx, ${sfx.length} sfx`);
+console.log(
+  `${CHECK ? 'checked' : 'built'} ${gfx.length} gfx, ${sfx.length} sfx, ${music.length} music`,
+);

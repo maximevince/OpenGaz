@@ -38,6 +38,10 @@ def sources_row(spec):
 
 def cut(spec_path, cache, out_dir):
     spec = json.load(open(spec_path))
+    if "credit" not in spec:
+        return None          # a written cue: render_music.py owns it
+    if spec.get("build") is False:
+        return None
     missing = [k for k in REQUIRED_CREDIT if not spec.get("credit", {}).get(k)]
     if missing:
         sys.exit(f"{spec_path}: credit is missing {', '.join(missing)}")
@@ -76,7 +80,7 @@ def main():
     ap.add_argument("--out", default="build/music")
     ap.add_argument("--sources", help="write the SOURCES.md rows here as well")
     args = ap.parse_args()
-    rows = [cut(cue, args.cache, args.out) for cue in args.cues]
+    rows = [row for row in (cut(cue, args.cache, args.out) for cue in args.cues) if row]
     print("\n" + "\n".join(rows))
     if args.sources:
         with open(args.sources, "w") as fh:

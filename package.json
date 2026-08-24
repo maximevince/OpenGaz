@@ -2,7 +2,7 @@
   "name": "opengaz",
   "private": true,
   "version": "0.4.0",
-  "description": "OpenGaz — an open-source homage to Gazillionaire Deluxe, playable in the browser (solo, hot-seat, online).",
+  "description": "OpenGaz \u2014 an open-source homage to Gazillionaire Deluxe, playable in the browser (solo, hot-seat, online).",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
@@ -23,6 +23,7 @@
     "assets:build": "node scripts/build-assets.mjs",
     "assets:check": "node scripts/build-assets.mjs --check",
     "assets:original": "bash scripts/import-original-assets.sh",
+    "music:build": "python3 scripts/music/render_music.py assets/src/music/cues/*.json --out public/assets/music && python3 scripts/music/cut_recording.py assets/src/music/cues/*.json --out public/assets/music && node scripts/build-assets.mjs",
     "guard:no-original-assets": "bash scripts/guard-no-original-assets.sh",
     "guard:no-debug": "bash scripts/guard-no-debug.sh"
   },
