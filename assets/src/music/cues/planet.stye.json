@@ -1,0 +1,42 @@
+{
+  "id": "planet.stye",
+  "score": "opengaz-stye-financial.json",
+  "for": "Stye — brisk C major turnaround",
+  "fromBeat": 0,
+  "bpm": 118,
+  "seconds": 16,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "keys",
+      "program": 4,
+      "level": 0.95,
+      "pan": 54
+    },
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.2,
+      "pan": 64
+    },
+    {
+      "match": "lead",
+      "program": 56,
+      "level": 0.85,
+      "pan": 74
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 28,
+      "level": 0.85
+    }
+  ]
+}

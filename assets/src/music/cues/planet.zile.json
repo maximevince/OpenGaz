@@ -1,0 +1,42 @@
+{
+  "id": "planet.zile",
+  "score": "opengaz-zile-banks.json",
+  "for": "Zile — counting-machine arpeggio",
+  "fromBeat": 0,
+  "bpm": 160,
+  "seconds": 26,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "arp",
+      "program": 11,
+      "level": 1.0,
+      "pan": 58
+    },
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.1,
+      "pan": 64
+    },
+    {
+      "match": "bell",
+      "program": 9,
+      "level": 0.8,
+      "pan": 74
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 34,
+      "level": 0.75
+    }
+  ]
+}

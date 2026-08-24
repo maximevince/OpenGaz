@@ -1,0 +1,46 @@
+{
+  "id": "planet.ooom",
+  "score": "opengaz-ooom-fortune.json",
+  "for": "Ooom — soft vibraphone with delay taps over a wet pad",
+  "fromBeat": 0,
+  "bpm": 120,
+  "seconds": 22,
+  "fadeOut": 3.5,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 110,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "figure",
+      "program": 11,
+      "level": 1.05,
+      "pan": 60,
+      "reverb": 110,
+      "octave": 1
+    },
+    {
+      "match": "shimmer",
+      "program": 99,
+      "level": 0.8,
+      "pan": 74,
+      "reverb": 120,
+      "octave": 1
+    },
+    {
+      "match": "pad",
+      "program": 91,
+      "level": 0.75,
+      "pan": 64,
+      "reverb": 120
+    },
+    {
+      "match": "low",
+      "program": 89,
+      "level": 0.5,
+      "pan": 64,
+      "reverb": 100
+    }
+  ]
+}

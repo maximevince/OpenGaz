@@ -1,0 +1,42 @@
+{
+  "id": "planet.loro",
+  "score": "opengaz-loro-pleasure.json",
+  "for": "Loro — steel-drum melody, sixteenth kick, playful",
+  "fromBeat": 0,
+  "bpm": 117,
+  "seconds": 9,
+  "fadeOut": 1.2,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "steel",
+      "program": 114,
+      "level": 1.1,
+      "pan": 58
+    },
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.05,
+      "pan": 64
+    },
+    {
+      "match": "marimba",
+      "program": 12,
+      "level": 0.6,
+      "pan": 72
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 30,
+      "level": 0.85
+    }
+  ]
+}

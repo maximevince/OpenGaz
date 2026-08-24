@@ -1,0 +1,30 @@
+{
+  "id": "planet.frac",
+  "score": "opengaz-frac-horns.json",
+  "for": "Frac — slow horn chorale",
+  "fromBeat": 0,
+  "bpm": 92,
+  "seconds": 10,
+  "fadeOut": 2.0,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "horn",
+      "program": 60,
+      "level": 1.0,
+      "pan": 62,
+      "reverb": 70
+    },
+    {
+      "match": "counter",
+      "program": 71,
+      "level": 0.8,
+      "pan": 70,
+      "reverb": 70
+    }
+  ]
+}

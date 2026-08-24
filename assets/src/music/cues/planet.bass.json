@@ -1,0 +1,36 @@
+{
+  "id": "planet.bass",
+  "score": "opengaz-bass-analysts.json",
+  "for": "Bass — B flat bass-guitar riff in sixteenths, no lead",
+  "fromBeat": 0,
+  "bpm": 135,
+  "seconds": 30,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.35,
+      "pan": 64
+    },
+    {
+      "match": "keys",
+      "program": 4,
+      "level": 0.6,
+      "pan": 54
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 26,
+      "level": 0.9
+    }
+  ]
+}

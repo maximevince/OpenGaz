@@ -1,0 +1,44 @@
+{
+  "id": "planet.queg",
+  "score": "opengaz-queg-smugglers.json",
+  "for": "Queg — C Dorian sitar over a drone, hand percussion",
+  "fromBeat": 0,
+  "bpm": 112,
+  "seconds": 22,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "sitar",
+      "program": 104,
+      "level": 1.1,
+      "pan": 60,
+      "reverb": 45
+    },
+    {
+      "match": "drone",
+      "program": 104,
+      "level": 0.6,
+      "pan": 68,
+      "reverb": 60
+    },
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.05,
+      "pan": 64
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 38,
+      "level": 0.85
+    }
+  ]
+}

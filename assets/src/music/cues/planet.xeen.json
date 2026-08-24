@@ -1,0 +1,36 @@
+{
+  "id": "planet.xeen",
+  "score": "opengaz-xeen-junkyard.json",
+  "for": "Xeen — scrap-metal percussion",
+  "fromBeat": 0,
+  "bpm": 95,
+  "seconds": 20,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 33,
+      "level": 1.2,
+      "pan": 64
+    },
+    {
+      "match": "clav",
+      "program": 7,
+      "level": 0.8,
+      "pan": 72
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 40,
+      "level": 1.0
+    }
+  ]
+}

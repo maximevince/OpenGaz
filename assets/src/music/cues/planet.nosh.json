@@ -1,0 +1,36 @@
+{
+  "id": "planet.nosh",
+  "score": "opengaz-nosh-fuel.json",
+  "for": "Nosh — pump-house groove",
+  "fromBeat": 0,
+  "bpm": 105,
+  "seconds": 23,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 38,
+      "level": 1.25,
+      "pan": 64
+    },
+    {
+      "match": "keys",
+      "program": 81,
+      "level": 0.8,
+      "pan": 70
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 30,
+      "level": 1.0
+    }
+  ]
+}
