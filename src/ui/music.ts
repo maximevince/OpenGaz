@@ -75,8 +75,11 @@ function ramp(d: Deck, to: number, done?: () => void) {
  * alone, so screens can call this on every change without restarting it. The same track that has
  * already finished stays finished unless `replay` is set — which is how landing on a planet you
  * are already standing on, or opening Explore, gets to hear it again.
+ *
+ * `cut` drops what was playing at once rather than fading it, for a moment that should not have
+ * the last planet's theme trailing under it — the victory screen, above all.
  */
-export function setTrack(id: string | null, { replay = false } = {}): void {
+export function setTrack(id: string | null, { replay = false, cut = false } = {}): void {
   wanted = id;
   const cur = deck(front);
   if (!cur) return;
@@ -87,7 +90,10 @@ export function setTrack(id: string | null, { replay = false } = {}): void {
   const url = id ? music(id) : undefined;
   if (id && !url) return; // no such track in the pack: leave what is playing alone
 
-  if (cur.id) ramp(cur, 0, () => cur.el.pause());
+  if (cur.id) {
+    if (cut) silence(cur);
+    else ramp(cur, 0, () => cur.el.pause());
+  }
   if (!url) {
     cur.id = null;
     return;
@@ -95,6 +101,15 @@ export function setTrack(id: string | null, { replay = false } = {}): void {
   const next = deck(1 - front)!;
   start(next, id!);
   front = 1 - front;
+}
+
+/** Stop a deck dead, mid-note. */
+function silence(d: Deck) {
+  if (d.fade) window.clearInterval(d.fade);
+  d.fade = undefined;
+  d.el.pause();
+  d.el.volume = 0;
+  d.spent = true;
 }
 
 /** Put a track on a deck from the top and let it run once. */
