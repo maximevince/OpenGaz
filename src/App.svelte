@@ -35,6 +35,7 @@
   import Lobby from './ui/screens/Lobby.svelte';
   import Waiting from './ui/screens/Waiting.svelte';
   import SoundTest from './ui/screens/SoundTest.svelte';
+  import Credits from './ui/screens/Credits.svelte';
 
   let ready = $state(false);
   // ?pack=opengaz forces the shipped pack even when the dev-only original pack is present
@@ -79,6 +80,7 @@
     lobby: Lobby,
     waiting: Waiting,
     soundtest: SoundTest,
+    credits: Credits,
   } as const;
   const Current = $derived(
     game.screen === 'title' ? null : (screens[game.screen as keyof typeof screens] ?? null),
