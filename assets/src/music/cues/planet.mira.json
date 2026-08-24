@@ -1,0 +1,30 @@
+{
+  "id": "planet.mira",
+  "score": "opengaz-mira-ambient.json",
+  "for": "Mira — ambient bed and a flute",
+  "fromBeat": 0,
+  "bpm": 60,
+  "seconds": 30,
+  "fadeOut": 4.0,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "pad",
+      "program": 89,
+      "level": 0.9,
+      "pan": 64,
+      "reverb": 90
+    },
+    {
+      "match": "flute",
+      "program": 73,
+      "level": 1.0,
+      "pan": 68,
+      "reverb": 80
+    }
+  ]
+}

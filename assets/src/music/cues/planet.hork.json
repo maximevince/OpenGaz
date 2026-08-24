@@ -1,0 +1,36 @@
+{
+  "id": "planet.hork",
+  "score": "opengaz-hork-media.json",
+  "for": "Hork — G minor newsroom groove at the tapping tempo",
+  "fromBeat": 0,
+  "bpm": 158,
+  "seconds": 24,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 39,
+      "level": 1.35,
+      "pan": 64
+    },
+    {
+      "match": "lead",
+      "program": 81,
+      "level": 0.75,
+      "pan": 72
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 24,
+      "level": 0.9
+    }
+  ]
+}

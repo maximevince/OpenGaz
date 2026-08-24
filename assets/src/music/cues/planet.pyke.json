@@ -1,0 +1,36 @@
+{
+  "id": "planet.pyke",
+  "score": "opengaz-pyke-industry.json",
+  "for": "Pyke — F# minor foundry riff",
+  "fromBeat": 0,
+  "bpm": 108,
+  "seconds": 14,
+  "fadeOut": 1.8,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "bass",
+      "program": 34,
+      "level": 1.25,
+      "pan": 64
+    },
+    {
+      "match": "guitar",
+      "program": 30,
+      "level": 0.9,
+      "pan": 70
+    },
+    {
+      "match": "drums",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 32,
+      "level": 1.0
+    }
+  ]
+}

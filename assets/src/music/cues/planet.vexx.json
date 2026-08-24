@@ -1,0 +1,42 @@
+{
+  "id": "planet.vexx",
+  "score": "opengaz-vexx-imperial.json",
+  "for": "Vexx — A minor processional, no kit",
+  "fromBeat": 0,
+  "bpm": 104,
+  "seconds": 12,
+  "fadeOut": 2.4,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "low",
+      "program": 48,
+      "level": 1.1,
+      "pan": 60
+    },
+    {
+      "match": "pad",
+      "program": 49,
+      "level": 0.85,
+      "pan": 64
+    },
+    {
+      "match": "horn",
+      "program": 60,
+      "level": 0.95,
+      "pan": 70
+    },
+    {
+      "match": "timpani",
+      "drum": true,
+      "program": 0,
+      "pan": 64,
+      "reverb": 70,
+      "level": 0.7
+    }
+  ]
+}

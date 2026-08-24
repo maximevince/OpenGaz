@@ -1,0 +1,29 @@
+{
+  "id": "planet.frac-clockwork",
+  "score": "opengaz-frac-clockwork.json",
+  "for": "Frac — bright clockwork figure",
+  "fromBeat": 0,
+  "bpm": 200,
+  "seconds": 10,
+  "fadeOut": 1.4,
+  "loudness": -16,
+  "gain": 0.85,
+  "legato": 0.95,
+  "reverb": 35,
+  "velocity": 88,
+  "parts": [
+    {
+      "match": "figure",
+      "program": 10,
+      "level": 1.0,
+      "pan": 62
+    },
+    {
+      "match": "pad",
+      "program": 52,
+      "level": 0.6,
+      "pan": 64,
+      "reverb": 60
+    }
+  ]
+}
