@@ -161,6 +161,14 @@ class GameStore {
       setTrack(null);
       return;
     }
+    if (this.screen === 'gameover') {
+      // Victory music from the moment "wins!!!" appears, not after clicking through — and it cuts
+      // the planet theme rather than playing over its tail. Loro's theme is what the original used.
+      const w = this.state.winner;
+      const wonByHuman = w !== null && !this.state.companies[w]!.isAI;
+      setTrack(wonByHuman ? 'planet.loro' : null, { replay: true, cut: true });
+      return;
+    }
     const opensWithMusic = this.screen === 'arrival' || this.screen === 'explore';
     setTrack(`planet.${this.planet.id}`, { replay: opensWithMusic });
   }
@@ -229,7 +237,8 @@ class GameStore {
       if (s.phase === 'gameOver') {
         const humans = s.companies.filter((c) => !c.isAI);
         const wonByHuman = s.winner !== null && !s.companies[s.winner]!.isAI;
-        play(wonByHuman ? 'win' : humans.every((c) => c.bankrupt) ? 'bankrupt' : 'lose');
+        // a win gets music instead (see cueMusic); a loss gets the sting and silence
+        if (!wonByHuman) play(humans.every((c) => c.bankrupt) ? 'bankrupt' : 'lose');
       }
       this.autosave();
       return;
