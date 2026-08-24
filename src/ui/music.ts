@@ -1,34 +1,31 @@
 /**
- * Music: one looping track at a time, on its own channel.
+ * Music: one track at a time, on its own channel, and it never repeats.
+ *
+ * A planet's theme starts when you land and plays through once — across the welcome screen and
+ * on into the main menu if you click on — then stops and stays stopped until something asks for
+ * it again. Nothing loops: a 24-second cue running all turn wears out its welcome long before
+ * the turn ends.
  *
  * Separate from `sound.ts` because the two behave differently — an effect is a one-shot that cuts
- * off whatever came before, a track loops until something replaces it and has to get out of the
- * way when an effect fires. Two `<audio>` elements are kept so a change can fade across rather
- * than cut, which matters when the planet changes mid-screen.
+ * off whatever came before, a track plays under the game and has to get out of the way when an
+ * effect fires. Two `<audio>` elements are kept so a planet change can fade across rather than cut.
  */
 
 import { music } from './assets';
 import { musicOn, onAudioModeChange } from './audio';
 
-/**
- * Two levels, following what the original did with its single channel: it played a planet's theme
- * only on the welcome screen and on Explore, and was silent everywhere else. We keep the theme
- * running as a quiet bed instead of stopping it, and lift it to full on those two screens — which
- * is only possible because music has its own channel here rather than sharing one MCI device.
- */
-const FULL = 0.55;
-const BED = 0.22;
+/** Under the game rather than over it, since it plays on past the screen that started it. */
+const VOLUME = 0.4;
 /** How far music ducks while an effect or a sting is playing. */
 const DUCK = 0.35;
 const FADE_MS = 700;
 const STEP_MS = 40;
 
-/** `full` on the arrival and explore screens, `bed` everywhere else. */
-export type Level = 'full' | 'bed';
-
 interface Deck {
   el: HTMLAudioElement;
   id: string | null;
+  /** true once the track has played through: it will not start again on its own */
+  spent: boolean;
   fade?: number;
 }
 
@@ -36,7 +33,6 @@ const decks: Deck[] = [];
 let front = 0;
 let ducked = false;
 let stinging = false;
-let level: Level = 'bed';
 let wanted: string | null = null;
 let stingEl: HTMLAudioElement | undefined;
 
@@ -44,18 +40,18 @@ function deck(i: number): Deck | undefined {
   if (typeof Audio === 'undefined') return undefined;
   if (!decks[i]) {
     const el = new Audio();
-    el.loop = true;
     el.preload = 'auto';
     el.volume = 0;
-    decks[i] = { el, id: null };
+    const d: Deck = { el, id: null, spent: false };
+    el.onended = () => {
+      d.spent = true;
+    };
+    decks[i] = d;
   }
   return decks[i];
 }
 
-const target = () => {
-  const base = level === 'full' ? FULL : BED;
-  return ducked || stinging ? base * DUCK : base;
-};
+const target = () => (ducked || stinging ? VOLUME * DUCK : VOLUME);
 
 function ramp(d: Deck, to: number, done?: () => void) {
   if (d.fade) window.clearInterval(d.fade);
@@ -73,40 +69,49 @@ function ramp(d: Deck, to: number, done?: () => void) {
 }
 
 /**
- * Play `id` (a semantic music id such as `planet.tilo`) at `at`, crossfading from whatever is
- * playing. `null` fades out. Repeating the current id only adjusts the level, so screens can call
- * this on every change.
+ * Ask for `id` (a semantic music id such as `planet.tilo`). `null` fades out.
+ *
+ * A different track crossfades in and plays once. The same track that is still playing is left
+ * alone, so screens can call this on every change without restarting it. The same track that has
+ * already finished stays finished unless `replay` is set — which is how landing on a planet you
+ * are already standing on, or opening Explore, gets to hear it again.
  */
-export function setTrack(id: string | null, at: Level = 'bed'): void {
+export function setTrack(id: string | null, { replay = false } = {}): void {
   wanted = id;
-  const levelChanged = at !== level;
-  level = at;
   const cur = deck(front);
   if (!cur) return;
   if (cur.id === id) {
-    if (levelChanged && cur.id && musicOn()) ramp(cur, target());
+    if (id && replay && cur.spent) start(cur, id);
     return;
   }
   const url = id ? music(id) : undefined;
   if (id && !url) return; // no such track in the pack: leave what is playing alone
 
-  const next = deck(1 - front)!;
   if (cur.id) ramp(cur, 0, () => cur.el.pause());
   if (!url) {
     cur.id = null;
     return;
   }
-  next.el.src = url;
-  next.el.currentTime = 0;
-  next.id = id;
-  next.el.volume = 0;
-  if (musicOn()) {
-    void next.el.play().catch(() => {
-      /* autoplay is blocked until the first gesture; the next call will get it */
-    });
-    ramp(next, target());
-  }
+  const next = deck(1 - front)!;
+  start(next, id!);
   front = 1 - front;
+}
+
+/** Put a track on a deck from the top and let it run once. */
+function start(d: Deck, id: string) {
+  const url = music(id);
+  if (!url) return;
+  if (d.fade) window.clearInterval(d.fade);
+  d.el.src = url;
+  d.el.currentTime = 0;
+  d.el.volume = 0;
+  d.id = id;
+  d.spent = false;
+  if (!musicOn()) return;
+  void d.el.play().catch(() => {
+    /* autoplay is blocked until the first gesture; the next call will get it */
+  });
+  ramp(d, target());
 }
 
 /** The track that should be sounding, whether or not the setting currently allows it. */
@@ -124,7 +129,7 @@ export function sting(id: string): void {
   const el = stingEl;
   el.src = url;
   el.currentTime = 0;
-  el.volume = FULL;
+  el.volume = VOLUME;
   stinging = true;
   const d = deck(front);
   if (d?.id) ramp(d, target());
@@ -160,20 +165,18 @@ export function duck(on: boolean): void {
 function apply() {
   const d = deck(front);
   if (!d) return;
-  if (musicOn()) {
-    if (wanted && d.id !== wanted) {
-      const url = music(wanted);
-      if (url) {
-        d.el.src = url;
-        d.id = wanted;
-      }
-    }
-    if (d.id) {
-      void d.el.play().catch(() => {});
-      ramp(d, target());
-    }
-  } else {
+  if (!musicOn()) {
     ramp(d, 0, () => d.el.pause());
+    return;
+  }
+  if (wanted && d.id !== wanted) {
+    start(d, wanted); // switched on part-way through a planet: begin its theme
+    return;
+  }
+  // a track that already played through stays finished; it waits for the next landing
+  if (d.id && !d.spent) {
+    void d.el.play().catch(() => {});
+    ramp(d, target());
   }
 }
 

@@ -151,9 +151,9 @@ class GameStore {
   /**
    * Music follows the planet you are standing on, and stops outside a game.
    *
-   * The original played a planet's theme on two screens only — the welcome screen and Explore —
-   * and was silent elsewhere. We keep it running underneath as a quiet bed and lift it to full on
-   * those same two screens. Called on every screen and state change; `setTrack` ignores a repeat.
+   * A theme plays once. Landing starts it and it carries on into the main menu; when it ends it
+   * stays ended. The two screens the original played music on — the welcome screen and Explore —
+   * are the two that will start it again if it has already finished.
    */
   cueMusic() {
     stopSting();
@@ -161,8 +161,8 @@ class GameStore {
       setTrack(null);
       return;
     }
-    const loud = this.screen === 'arrival' || this.screen === 'explore';
-    setTrack(`planet.${this.planet.id}`, loud ? 'full' : 'bed');
+    const opensWithMusic = this.screen === 'arrival' || this.screen === 'explore';
+    setTrack(`planet.${this.planet.id}`, { replay: opensWithMusic });
   }
 
   /** dismiss the weekly standings and route on to whatever comes next */
