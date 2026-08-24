@@ -10,9 +10,9 @@
 import { ZZFX } from 'zzfx';
 import { COMMODITIES } from '../engine';
 import { sfx } from './assets';
+import { effectsOn, onAudioModeChange, setAudioMode } from './audio';
+import { duck } from './music';
 import { commoditySound } from './soundmap';
-
-const MUTE_KEY = 'opengaz.muted';
 
 /** ZzFX parameter array (see https://killedbyapixel.github.io/ZzFX/). */
 type Preset = (number | undefined)[];
@@ -227,30 +227,23 @@ for (const c of COMMODITIES) {
 /** Every id `play()` knows about — used by the sound-test screen. */
 export const soundIds = (): string[] => Object.keys(PRESETS);
 
-let muted = (() => {
-  try {
-    return localStorage.getItem(MUTE_KEY) === '1';
-  } catch {
-    return false;
-  }
-})();
+// The setting itself lives in `audio.ts`, shared with the music channel; these keep the older
+// mute-shaped API the toggle and the sound test already use.
 const listeners = new Set<() => void>();
-export const isMuted = () => muted;
+const muted = () => !effectsOn();
+export const isMuted = () => muted();
 export function setMuted(m: boolean) {
-  muted = m;
-  if (m) stop();
-  try {
-    localStorage.setItem(MUTE_KEY, m ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
-  listeners.forEach((l) => l());
+  setAudioMode(m ? 'off' : 'all');
 }
-export const toggleMuted = () => setMuted(!muted);
+export const toggleMuted = () => setMuted(!muted());
 export function onMuteChange(l: () => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
 }
+onAudioModeChange(() => {
+  if (muted()) stop();
+  listeners.forEach((l) => l());
+});
 
 const cache = new Map<string, HTMLAudioElement>();
 
@@ -306,6 +299,7 @@ export function stop(): void {
     }
     h.nodes = [];
   }
+  duck(false);
   setPlaying(null);
 }
 
@@ -319,7 +313,7 @@ const holding = () => !!current && (!!current.el || current.timers.length > 0);
  * and would otherwise pile up — but lets a short synth one-shot ring out under it.
  */
 export function play(id: string, volume = 1, source: Source = 'auto'): void {
-  if (muted) return;
+  if (muted()) return;
   if (holding()) stop();
   const url = source === 'synth' ? undefined : sfx(`sfx.${id}`);
   try {
@@ -337,6 +331,8 @@ export function play(id: string, volume = 1, source: Source = 'auto'): void {
         if (current === h) stop();
       };
       setPlaying(id);
+      // only pack samples run long enough for a duck to be heard; synth one-shots are a blip
+      duck(true);
       void a.play().catch(() => {});
       return;
     }
@@ -348,7 +344,7 @@ export function play(id: string, volume = 1, source: Source = 'auto'): void {
     setPlaying(id);
     // the volume is global to ZzFX, so each note has to set it again when its turn comes
     const fire = (n: Preset) => {
-      if (muted || current !== h) return;
+      if (muted() || current !== h) return;
       ZZFX.volume = 0.3 * volume;
       const node = ZZFX.play(...n) as AudioBufferSourceNode | undefined;
       if (!node) return;
