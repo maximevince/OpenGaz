@@ -43,7 +43,14 @@
     <h2>{heading}</h2>
     <div class="body" class:with-face={!!rival}>
       {#if rival}
-        <Portrait id={`op${rival.aiIndex}`} caption={rival.name} width={150} height={200} />
+        <!-- the rivals are 320x200 creature cards, so they hang in a landscape frame -->
+        <Portrait
+          id={`op${rival.aiIndex}`}
+          caption={rival.name}
+          width={240}
+          height={175}
+          fit="contain"
+        />
       {/if}
       <p>{card?.text ?? ''}</p>
     </div>
@@ -115,6 +122,10 @@
     display: flex;
     gap: 14px;
     align-items: flex-start;
+  }
+  /* the creature card keeps its 320x200 shape; the text takes what is left */
+  .body :global(.portrait) {
+    flex: none;
   }
   .body.with-face p {
     padding-top: 4px;
