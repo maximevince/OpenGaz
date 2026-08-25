@@ -36,6 +36,13 @@ const SPEC = [
   [/^bg\/stars\/\d+$/, [640, 480]],
 ];
 
+/**
+ * Portraits are cropped out of generated contact sheets, so a cell can come away with a sliver
+ * of the sheet's white gutter down one or two edges. Trim that before the resize — a crop that
+ * never touched a gutter has no white border to lose.
+ */
+const GUTTERED = /^portrait\//;
+
 async function walk(dir, exts) {
   const out = [];
   let entries;
@@ -76,7 +83,10 @@ async function buildGfx() {
     if (!CHECK) {
       const dest = path.join(OUT, 'gfx', `${stem}.png`);
       await fs.mkdir(path.dirname(dest), { recursive: true });
-      await sharp(f)
+      const src = GUTTERED.test(stem)
+        ? sharp(f).trim({ background: '#ffffff', threshold: 30 })
+        : sharp(f);
+      await src
         .resize(w, h, { fit: 'cover', position: 'centre' })
         .png({ compressionLevel: 9, palette: true, quality: 90 })
         .toFile(dest);
