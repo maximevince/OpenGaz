@@ -3,6 +3,7 @@
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { fmt } from '../format';
+  import { online } from '../../net/online.svelte';
   import { game } from '../game.svelte';
   const s = $derived(game.s);
   const winner = $derived(s.winner !== null ? s.companies[s.winner] : null);
@@ -30,7 +31,12 @@
       >
       <Btn onclick={() => game.dispatch({ type: 'retireCompetition' })}>End game</Btn>
     {:else}
-      <Btn onclick={() => game.go('title')}>Back to title</Btn>
+      <Btn
+        onclick={() => {
+          online.leave();
+          game.go('title');
+        }}>Back to title</Btn
+      >
     {/if}
   </div>
 </div>

@@ -81,6 +81,10 @@ class Online {
   myName = $state('');
   lobby = $state<Lobby | null>(null);
   peers = $state<Record<string, string>>({}); // peerId -> player name
+  /** a peer we could not connect to, without that ending the session (last one wins) */
+  notice = $state<string | null>(null);
+  /** what Trystero said about peers it failed to connect, to quote if the join then times out */
+  private peerErrors: string[] = [];
   /** number of actions applied so far this game — one global counter, same on every peer */
   seq = 0;
 
@@ -159,13 +163,15 @@ class Online {
     this.joinTimer = setTimeout(() => {
       if (this.status !== 'connecting') return;
       const code = this.code;
+      const detail = this.peerErrors.at(-1);
       this.leave();
       this.code = code;
       this.status = 'error';
       this.error =
         `No answer from room ${code}. Either nobody is hosting it right now, or the two ` +
         `browsers cannot reach each other: mobile networks and office firewalls often block the ` +
-        `direct connection this game needs. Hosting from a home connection usually works.`;
+        `direct connection this game needs. Hosting from a home connection usually works.` +
+        (detail ? ` (${detail})` : '');
     }, JOIN_TIMEOUT_MS);
   }
 
@@ -178,10 +184,7 @@ class Online {
     let room: Room;
     try {
       room = joinRoom({ appId: APP_ID }, `room-${code}`, {
-        onJoinError: (e) => {
-          this.error = e.error;
-          this.status = 'error';
-        },
+        onJoinError: (e) => this.peerFailed(e.peerId, e.error),
       });
     } catch (e) {
       this.status = 'error';
@@ -315,6 +318,23 @@ class Online {
     };
   }
 
+  /**
+   * Trystero could not get a connection up with one peer (handshake timed out, or ICE failed
+   * after the SDP exchange). That is between us and that one browser: the room, the host and
+   * everyone else are unaffected, so it must not end our session. While still connecting we
+   * cannot tell whether the peer that failed was the host, so the join timer stays the judge,
+   * and it quotes what Trystero said when it gives up.
+   */
+  private peerFailed(peerId: string, error: string): void {
+    console.warn(`[online] could not connect to peer ${peerId}: ${error}`);
+    this.peerErrors.push(error);
+    if (this.status === 'connecting') return;
+    const who = this.peers[peerId] ?? 'one player';
+    this.notice =
+      `Could not connect to ${who} — their network may block direct connections. ` +
+      `They can try joining again; everyone else is unaffected.`;
+  }
+
   /** the host has answered, so the join worked — stop the give-up timer */
   private joined(): void {
     if (this.joinTimer) clearTimeout(this.joinTimer);
@@ -330,6 +350,8 @@ class Online {
     this.lobby = null;
     this.code = null;
     this.peers = {};
+    this.notice = null;
+    this.peerErrors = [];
     this.seq = 0;
   }
 

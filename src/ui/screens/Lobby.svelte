@@ -176,6 +176,7 @@
         </label>
         <span>Players here: {Object.values(online.peers).join(', ')}</span>
       </div>
+      {#if online.notice}<p class="err">{online.notice}</p>{/if}
       <div class="row">
         <Btn
           onclick={() => {
@@ -195,7 +196,8 @@
   <div class="bottom">
     <Btn
       onclick={() => {
-        if (online.status === 'idle' || online.status === 'error') game.go('title');
+        online.leave();
+        game.go('title');
       }}>Back to title</Btn
     >
   </div>

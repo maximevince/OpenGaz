@@ -29,6 +29,12 @@
     <div class="row">
       <Btn onclick={() => game.go('money')}>Money &amp; graphs</Btn>
       <Btn onclick={() => online.requestSync()}>Resync</Btn>
+      <Btn
+        onclick={() => {
+          online.leave();
+          game.go('title');
+        }}>Leave game</Btn
+      >
     </div>
   </div>
 </div>

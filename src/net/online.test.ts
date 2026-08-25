@@ -27,12 +27,15 @@ const net = vi.hoisted(() => {
     onPeerJoin: null as ((peerId: string) => void) | null,
     onPeerLeave: null as ((peerId: string) => void) | null,
   };
+  const callbacks: { onJoinError?: (e: { peerId: string; error: string }) => void } = {};
   return {
     sent,
     actions,
-    joinRoom: () => {
+    callbacks,
+    joinRoom: (_cfg: unknown, _id: string, cb: typeof callbacks) => {
       sent.length = 0;
       actions.clear();
+      Object.assign(callbacks, cb);
       return room;
     },
   };
@@ -180,6 +183,48 @@ describe('joining a room that never answers', () => {
 
     vi.advanceTimersByTime(online.joinTimeout * 3000);
     expect(online.status).toBe('lobby');
+  });
+});
+
+describe('a peer Trystero cannot connect to', () => {
+  const ICE = 'could not connect to peer X after exchanging SDP; configure TURN servers';
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    online.leave();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('does not end the host session — the room and everyone else are fine', () => {
+    online.host('Hosty');
+    net.callbacks.onJoinError!({ peerId: 'X', error: ICE });
+    expect(online.status).toBe('lobby');
+    expect(online.lobby).not.toBeNull();
+    expect(online.notice).toMatch(/one player/);
+  });
+
+  it('does not throw a guest out of a lobby it already reached', () => {
+    online.join('ABCDEF', 'Guest');
+    deliver('lobby', lobbyFor(fresh()), HOST);
+    deliver('hello', { name: 'Flaky' }, 'X');
+    net.callbacks.onJoinError!({ peerId: 'X', error: 'handshake timed out after 10000ms' });
+    expect(online.status).toBe('lobby');
+    expect(online.notice).toMatch(/Flaky/);
+  });
+
+  it('keeps a join waiting for the host, and quotes the failure if it then gives up', () => {
+    online.join('ABCDEF', 'Guest');
+    net.callbacks.onJoinError!({ peerId: 'X', error: ICE });
+    expect(online.status).toBe('connecting');
+
+    vi.advanceTimersByTime(online.joinTimeout * 1000);
+    expect(online.status).toBe('error');
+    expect(online.error).toMatch(/ABCDEF/);
+    expect(online.error).toContain(ICE);
+    expect(online.notice).toBeNull();
   });
 });
 
