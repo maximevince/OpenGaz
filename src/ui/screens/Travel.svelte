@@ -10,6 +10,7 @@
   import HistoryChart from '../components/HistoryChart.svelte';
   import StrengthPie from '../components/StrengthPie.svelte';
   import Btn from '../components/Btn.svelte';
+  import { cutout } from '../cutout';
   import { game } from '../game.svelte';
 
   const s = $derived(game.s);
@@ -19,6 +20,17 @@
   const stars = img('bg.stars.1');
   /* the dealer picture, not the 80x50 map icon: at this size the icon is a blur */
   const ship = $derived(img(`ship.${co.ship.defId}.picture`) ?? img(`ship.${co.ship.defId}.icon`));
+  /** the same art with its own starfield keyed out, so it flies over ours */
+  let sprite = $state<string | undefined>(undefined);
+  $effect(() => {
+    const src = ship;
+    if (!src) return;
+    let live = true;
+    cutout(src).then((u) => {
+      if (live) sprite = u;
+    });
+    return () => (live = false);
+  });
 
   /** the flight plays itself out, then the chart waits for a click */
   let stage: 'flight' | 'chart' = $state('flight');
@@ -39,8 +51,8 @@
     onclick={skip}
   >
     <!-- the ship crosses the starfield and leaves the frame; that is the point of it -->
-    {#if ship}
-      <img class="ship" src={ship} alt="" data-overflow-ok />
+    {#if sprite ?? ship}
+      <img class="ship" src={sprite ?? ship} alt="" data-overflow-ok />
     {:else}
       <div class="ship glyph" data-overflow-ok>🚀</div>
     {/if}
@@ -74,15 +86,12 @@
     overflow: hidden;
     cursor: pointer;
   }
-  /*
-   * The ship art is a sprite on solid black, the way the original blitted it over a black
-   * starfield. `screen` drops that black out again so it flies over our stars, not a box.
-   */
+  /* Every ship in the pack is drawn nose-left with its exhaust to the right, so the flight
+     runs right to left; anything else has the ship flying backwards. */
   .ship {
-    mix-blend-mode: screen;
     position: absolute;
-    left: -140px;
-    top: 58%;
+    left: 100%;
+    top: 24%;
     width: 170px;
     image-rendering: pixelated;
     animation: cross 2.4s linear forwards;
@@ -97,7 +106,7 @@
       transform: translate(0, 0);
     }
     to {
-      transform: translate(820px, -180px);
+      transform: translate(-820px, 180px);
     }
   }
   .caption {
