@@ -137,6 +137,7 @@ const SIMPLE_SCREENS = [
   'arrival',
   'dispatch',
   'travel',
+  'weekchart',
 ];
 
 const scenarios = [
@@ -180,15 +181,13 @@ const scenarios = [
       opengaz.game.go('gameover')`,
   },
   {
-    // the flight's chart stage: the starfield is skipped by a click, as it is in play
-    name: 'travel:history',
-    setup: `${BOOT}; opengaz.game.travelChart = 'history';
-      opengaz.game.go('travel'); await $$tick(); await $$click('.flight');`,
+    // the chart that follows the weekly standings, in both of its forms
+    name: 'weekchart:history',
+    setup: `${BOOT}; opengaz.game.weekChart = 'history'; opengaz.game.go('weekchart');`,
   },
   {
-    name: 'travel:strength',
-    setup: `${BOOT}; opengaz.game.travelChart = 'strength';
-      opengaz.game.go('travel'); await $$tick(); await $$click('.flight');`,
+    name: 'weekchart:strength',
+    setup: `${BOOT}; opengaz.game.weekChart = 'strength'; opengaz.game.go('weekchart');`,
   },
   {
     name: 'market:buy-prompt',

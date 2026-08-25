@@ -56,6 +56,7 @@ export type Screen =
   | 'map'
   | 'charts'
   | 'travel'
+  | 'weekchart'
   | 'event'
   | 'dispatch'
   | 'arrival'
@@ -101,8 +102,8 @@ class GameStore {
   private newsShownWeek = -1;
   /** a departure owes the local player a flight, shown once the ship is actually in the air */
   private travelPending = false;
-  /** which chart the flight ends on — the original alternated between the two */
-  travelChart = $state<'history' | 'strength'>('history');
+  /** which chart the week's standings are followed by — the original alternated between them */
+  weekChart = $state<'history' | 'strength'>('history');
 
   constructor() {
     online.onRemoteAction = (a) => this.applyRemote(a);
@@ -266,8 +267,15 @@ class GameStore {
     else this.afterChange();
   }
 
-  /** dismiss the weekly standings and route on to whatever comes next */
+  /** dismiss the weekly standings; the week's chart is the other half of the same page */
   closeReport() {
+    this.error = null;
+    if (!this.state) return;
+    this.go('weekchart');
+  }
+
+  /** dismiss the week's chart and route on to whatever comes next */
+  closeWeekChart() {
     this.error = null;
     if (this.state) this.afterChange();
   }
@@ -312,12 +320,7 @@ class GameStore {
     }
     play(trade || ACTION_SOUND[a.type] || '');
     if (online.active) online.broadcastAction(a, this.state);
-    if (a.type === 'journey') {
-      this.travelPending = true;
-      // the history line needs two recordings to be a line; before that only the pie can be drawn
-      this.travelChart =
-        canPlotHistory(this.state) && this.s.week % 3 !== 0 ? 'history' : 'strength';
-    }
+    if (a.type === 'journey') this.travelPending = true;
     this.afterChange();
     return true;
   }
@@ -354,6 +357,9 @@ class GameStore {
     // the week rolled over: everyone sees the standings once before play resumes
     if (s.week !== this.reportedWeek) {
       this.reportedWeek = s.week;
+      // the chart that follows them is drawn from the figures the rollover just recorded, so
+      // its bars and the standings table cannot disagree. A line needs two of those to exist.
+      this.weekChart = canPlotHistory(s) && s.week % 3 !== 0 ? 'history' : 'strength';
       this.screen = 'report';
       this.autosave();
       return;
@@ -408,6 +414,7 @@ class GameStore {
           'arrival',
           'report',
           'travel',
+          'weekchart',
           'handoff',
           'gameover',
           'title',
