@@ -11,7 +11,10 @@
   } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
+  import HistoryChart from '../components/HistoryChart.svelte';
   import Plate from '../components/Plate.svelte';
+  import StrengthPie from '../components/StrengthPie.svelte';
+  import { atWeekStart, canPlotHistory, colorOf } from '../charts';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
   const s = $derived(game.s);
@@ -20,32 +23,10 @@
   const level = $derived(LEVEL_BY_ID(s.settings.level));
   const target = $derived(s.settings.targetNetWorth);
   let tab: 'summary' | 'history' | 'networth' | 'strength' | 'players' | 'ship' = $state('summary');
-  const colors = ['#ff0000', '#00c000', '#0000ff', '#ff00ff', '#00c0c0', '#c0c000', '#ff8000'];
   const status = $derived(companyStatus(nw));
-  /** net worth as recorded at the week rollover — what the charts are drawn from */
-  const atWeekStart = (c: (typeof s.companies)[number]) =>
-    c.netWorthHistory[c.netWorthHistory.length - 1] ?? 0;
   const nwStart = $derived(atWeekStart(co));
-
-  // history chart
-  const W = 600,
-    H = 250,
-    PL = 60,
-    PB = 20;
-  /**
-   * Setup seeds the ring with a cosmetic opening value at index 0 so the bars have something
-   * to show in week 1. It is never plotted: until the ring wraps past week 20 the line starts
-   * at the first real weekly recording.
-   */
-  const hist = $derived(
-    s.companies.map((c) => (s.week <= 20 ? c.netWorthHistory.slice(1) : c.netWorthHistory)),
-  );
-  /** week 1 has a single real recording, so there is no line to draw yet */
-  const canPlot = $derived((hist[0]?.length ?? 0) > 1);
-  const all = $derived(hist.flat());
-  const minY = $derived(Math.min(0, ...all));
-  const maxY = $derived(Math.max(100000, ...all));
-  const y = (v: number) => H - PB - ((v - minY) / (maxY - minY)) * (H - PB - 10);
+  /** week 1 has a single recording, so the history line has nothing to join up yet */
+  const canPlot = $derived(canPlotHistory(s));
   const shipPic = $derived(img(`ship.${co.ship.defId}.picture`));
   /**
    * Rival card art. These are the original's landscape creature cards — a whole creature on
@@ -76,28 +57,6 @@
   const negFrac = $derived(maxNeg / span);
   /** length within a half; the halves are already proportional, so this stays to scale */
   const barPct = (v: number, max: number) => Math.max(2, (Math.abs(v) / max) * 100);
-
-  // market strength: share of the fleet's total mass, as a pie
-  const alive = $derived(s.companies.map((c, i) => ({ c, i })).filter((x) => !x.c.bankrupt));
-  const strengthTotal = $derived(alive.reduce((a, x) => a + x.c.ship.tons, 0));
-  const R = 92;
-  /** pie slices, each carrying the SVG path for its wedge */
-  const slices = $derived.by(() => {
-    let from = -Math.PI / 2;
-    return alive.map(({ c, i }) => {
-      const frac = c.ship.tons / Math.max(1, strengthTotal);
-      const to = from + frac * Math.PI * 2;
-      const p = (a: number) => `${(R * Math.cos(a)).toFixed(2)},${(R * Math.sin(a)).toFixed(2)}`;
-      // a single company owning the whole fleet cannot be drawn as an arc — draw a full circle
-      const d =
-        frac >= 0.999
-          ? `M 0,-${R} A ${R},${R} 0 1 1 -0.01,-${R} Z`
-          : `M 0,0 L ${p(from)} A ${R},${R} 0 ${to - from > Math.PI ? 1 : 0} 1 ${p(to)} Z`;
-      const mid = (from + to) / 2;
-      from = to;
-      return { c, i, frac, d, lx: R * 0.62 * Math.cos(mid), ly: R * 0.62 * Math.sin(mid) };
-    });
-  });
 </script>
 
 <div class="money">
@@ -117,37 +76,7 @@
       </div>
       <div class="coins">🪙</div>
     {:else if tab === 'history'}
-      <svg viewBox="0 0 {W} {H}" class="chart">
-        <line x1={PL} y1={y(0)} x2={W - 6} y2={y(0)} stroke="#000" />
-        <line x1={PL} y1={6} x2={PL} y2={H - PB} stroke="#000" />
-        <text x={PL - 4} y={y(maxY) + 10} font-size="11" text-anchor="end">{fmt(maxY / 1000)}k</text
-        >
-        <text x={PL - 4} y={y(0) + 4} font-size="11" text-anchor="end">0</text>
-        {#if minY < 0}<text x={PL - 4} y={y(minY)} font-size="11" text-anchor="end"
-            >{fmt(minY / 1000)}k</text
-          >{/if}
-        {#each hist as h, ci (ci)}
-          {#if h.length > 1 && !s.companies[ci]!.bankrupt}
-            <polyline
-              points={h
-                .map((v, i) => `${PL + (i / (h.length - 1)) * (W - PL - 10)},${y(v)}`)
-                .join(' ')}
-              fill="none"
-              stroke={colors[ci % colors.length]}
-              stroke-width={ci === game.ci ? 3 : 1.5}
-            />
-          {/if}
-        {/each}
-        <text x={W / 2} y={H - 4} font-size="11" text-anchor="middle"
-          >last {hist[0]?.length ?? 0} weeks</text
-        >
-      </svg>
-      <div class="legend">
-        {#each s.companies as c, i (c.id)}<span style:color={colors[i % colors.length]}
-            >■ {c.name}
-            {c.bankrupt ? '(bust)' : fmt(atWeekStart(c))}</span
-          >{/each}
-      </div>
+      <HistoryChart {s} highlight={game.ci} />
     {:else if tab === 'networth'}
       <div class="bars">
         <p class="note">Net worth as recorded at the start of week {s.week}.</p>
@@ -164,7 +93,7 @@
                   <div
                     class="bar neg"
                     style:width={`${barPct(v, maxNeg)}%`}
-                    style:background={colors[i % colors.length]}
+                    style:background={colorOf(i)}
                   ></div>
                 {/if}
               </div>
@@ -173,7 +102,7 @@
                   <div
                     class="bar"
                     style:width={`${barPct(v, maxPos)}%`}
-                    style:background={colors[i % colors.length]}
+                    style:background={colorOf(i)}
                   ></div>
                 {/if}
               </div>
@@ -184,50 +113,16 @@
         <div class="goal">goal: {fmt(target)}</div>
       </div>
     {:else if tab === 'strength'}
-      <div class="strength">
-        <svg class="pie" viewBox="-110 -110 220 220" role="img" aria-label="Market strength">
-          {#each slices as sl (sl.c.id)}
-            <path d={sl.d} fill={colors[sl.i % colors.length]} stroke="#000" stroke-width="1.5" />
-            {#if sl.frac > 0.07}
-              <text
-                x={sl.lx}
-                y={sl.ly}
-                font-size="12"
-                font-weight="bold"
-                fill="#fff"
-                text-anchor="middle"
-                dominant-baseline="middle">{Math.round(sl.frac * 100)}%</text
-              >
-            {/if}
-          {/each}
-        </svg>
-        <div class="pielegend">
-          <p class="note">
-            Market strength is each company's share of the fleet's total mass. Ships start at 400
-            tons; every enlargement won at auction adds 200.
-          </p>
-          {#each slices as sl (sl.c.id)}
-            <div class="prow">
-              <span class="swatch" style:background={colors[sl.i % colors.length]}></span>
-              <span class="bn">{sl.c.name}</span>
-              <span class="bv">{sl.c.ship.tons} t · {Math.round(sl.frac * 100)}%</span>
-            </div>
-          {/each}
-        </div>
-      </div>
+      <StrengthPie {s} />
     {:else if tab === 'players'}
       <div class="players">
         {#each s.companies as c, i (c.id)}
           {@const face = faceOf(c)}
-          <div class="pl" class:bust={c.bankrupt} style:border-color={colors[i % colors.length]}>
+          <div class="pl" class:bust={c.bankrupt} style:border-color={colorOf(i)}>
             {#if face}
-              <img class="face" src={face} alt="" style:border-color={colors[i % colors.length]} />
+              <img class="face" src={face} alt="" style:border-color={colorOf(i)} />
             {:else}
-              <div
-                class="face mono"
-                style:border-color={colors[i % colors.length]}
-                style:background={colors[i % colors.length]}
-              >
+              <div class="face mono" style:border-color={colorOf(i)} style:background={colorOf(i)}>
                 {monogram(c.name)}
               </div>
             {/if}
@@ -335,22 +230,6 @@
     font-size: 150px;
     line-height: 1;
   }
-  .chart {
-    width: 100%;
-    height: 100%;
-    background: #fff;
-    border: 2px inset #808080;
-    font-family: var(--font-ui);
-  }
-  .legend {
-    position: absolute;
-    left: 70px;
-    top: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    font: bold 10px var(--font-ui);
-  }
   .bars {
     padding: 12px;
     display: flex;
@@ -451,36 +330,6 @@
   }
   .det {
     color: #303030;
-  }
-  /* market strength */
-  .strength {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 10px;
-    padding: 10px;
-    align-items: center;
-    min-height: 0;
-  }
-  .pie {
-    width: 100%;
-    max-height: 240px;
-  }
-  .pielegend {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font: bold 12px var(--font-ui);
-  }
-  .prow {
-    display: grid;
-    grid-template-columns: 16px 1fr 120px;
-    gap: 8px;
-    align-items: center;
-  }
-  .swatch {
-    width: 14px;
-    height: 14px;
-    border: 1px solid #000;
   }
   .iconbar {
     display: flex;

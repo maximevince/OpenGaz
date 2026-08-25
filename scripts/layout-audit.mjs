@@ -180,6 +180,17 @@ const scenarios = [
       opengaz.game.go('gameover')`,
   },
   {
+    // the flight's chart stage: the starfield is skipped by a click, as it is in play
+    name: 'travel:history',
+    setup: `${BOOT}; opengaz.game.travelChart = 'history';
+      opengaz.game.go('travel'); await $$tick(); await $$click('.flight');`,
+  },
+  {
+    name: 'travel:strength',
+    setup: `${BOOT}; opengaz.game.travelChart = 'strength';
+      opengaz.game.go('travel'); await $$tick(); await $$click('.flight');`,
+  },
+  {
     name: 'market:buy-prompt',
     setup: `${BOOT}; opengaz.game.go('market'); await $$tick();
       await $$click('tbody tr'); await $$click('button', 'Buy');`,

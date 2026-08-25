@@ -5,6 +5,7 @@
 import { online } from '../net/online.svelte';
 import { play } from './sound';
 import { currentTrack, setTrack } from './music';
+import { canPlotHistory } from './charts';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
@@ -98,6 +99,10 @@ class GameStore {
   cardSource = $state<'arrival' | 'news'>('arrival');
   /** last week whose rival news has been dealt out (the pile is global, so once per week) */
   private newsShownWeek = -1;
+  /** a departure owes the local player a flight, shown once the ship is actually in the air */
+  private travelPending = false;
+  /** which chart the flight ends on — the original alternated between the two */
+  travelChart = $state<'history' | 'strength'>('history');
 
   constructor() {
     online.onRemoteAction = (a) => this.applyRemote(a);
@@ -182,8 +187,15 @@ class GameStore {
       return;
     }
     // an arrival that ends the turn has no planet to welcome you to
-    if (this.s.awaitingHandoff) this.dispatch({ type: 'continue' });
-    else this.go('arrival');
+    if (this.s.awaitingHandoff) {
+      // your own departure: the card was the flight plan, so now fly it
+      if (this.travelPending) {
+        this.screen = 'travel';
+        this.cueMusic();
+        return;
+      }
+      this.dispatch({ type: 'continue' });
+    } else this.go('arrival');
   }
 
   private dealCards(source: 'arrival' | 'news') {
@@ -238,6 +250,14 @@ class GameStore {
     if (currentTrack()?.startsWith('op')) setTrack(null, { cut: true });
   }
 
+  /** the flight is flown: hand over, and route on to whatever this week holds */
+  endTravel() {
+    this.travelPending = false;
+    if (!this.state) return;
+    if (this.s.awaitingHandoff) this.dispatch({ type: 'continue' });
+    else this.afterChange();
+  }
+
   /** dismiss the weekly standings and route on to whatever comes next */
   closeReport() {
     this.error = null;
@@ -284,6 +304,12 @@ class GameStore {
     }
     play(trade || ACTION_SOUND[a.type] || '');
     if (online.active) online.broadcastAction(a, this.state);
+    if (a.type === 'journey') {
+      this.travelPending = true;
+      // the history line needs two recordings to be a line; before that only the pie can be drawn
+      this.travelChart =
+        canPlotHistory(this.state) && this.s.week % 3 !== 0 ? 'history' : 'strength';
+    }
     this.afterChange();
     return true;
   }
@@ -298,6 +324,7 @@ class GameStore {
   private route() {
     const s = this.s;
     if (s.phase === 'gameOver' || s.phase === 'winner') {
+      this.travelPending = false;
       this.state = s;
       this.screen = 'gameover';
       if (s.phase === 'gameOver') {
