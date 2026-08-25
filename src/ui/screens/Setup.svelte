@@ -250,8 +250,15 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    /* minmax(0, 1fr), not 1fr: an input's intrinsic width is otherwise a floor
+       on the column, and a long ship name would push the row past the section
+       and grow a horizontal scrollbar */
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 4px;
+  }
+  .name {
+    min-width: 0;
+    width: 100%;
   }
   .dice {
     background: var(--c-face);
