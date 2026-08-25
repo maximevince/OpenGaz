@@ -6,14 +6,26 @@
     caption,
     width = 220,
     height = 330,
-  }: { id: string; caption: string; width?: number; height?: number } = $props();
+    fit = 'cover',
+  }: {
+    id: string;
+    caption: string;
+    width?: number;
+    height?: number;
+    /**
+     * `cover` for the tall character busts, which are drawn deeper than their frame.
+     * `contain` for the rivals' landscape creature cards: cropping those to a bust throws
+     * most of the creature away, so they are letterboxed on black instead.
+     */
+    fit?: 'cover' | 'contain';
+  } = $props();
   const src = $derived(img(`portrait.${id}`));
 </script>
 
 <div class="portrait" style:width={`${width}px`} style:height={`${height}px`}>
-  <div class="frame">
+  <div class="frame" class:letterbox={fit === 'contain'}>
     {#if src}
-      <img {src} alt={caption} />
+      <img {src} alt={caption} style:object-fit={fit} />
     {:else}
       <div class="ph"><span>{caption}</span></div>
     {/if}
@@ -45,12 +57,12 @@
     justify-content: center;
     overflow: hidden;
   }
+  .frame.letterbox {
+    background: #000;
+  }
   img {
     width: 100%;
     height: 100%;
-    /* Portrait masters are intentionally taller than this framed area.  Fill the
-       frame and crop vertically rather than letterboxing with the frame white. */
-    object-fit: cover;
     display: block;
   }
   .ph {
