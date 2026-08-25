@@ -186,16 +186,24 @@ class GameStore {
       this.afterChange(); // the news is dealt; route on to whatever this turn actually is
       return;
     }
-    // an arrival that ends the turn has no planet to welcome you to
-    if (this.s.awaitingHandoff) {
-      // your own departure: the card was the flight plan, so now fly it
-      if (this.travelPending) {
-        this.screen = 'travel';
-        this.cueMusic();
-        return;
-      }
+    // a landing's cards are read after the welcome, so the turn can begin once they run out
+    if (!this.s.awaitingHandoff) {
       this.dispatch({ type: 'continue' });
-    } else this.go('arrival');
+      return;
+    }
+    // your own departure: the card was the flight plan, so now fly it
+    if (this.travelPending) {
+      this.screen = 'travel';
+      this.cueMusic();
+      return;
+    }
+    this.dispatch({ type: 'continue' });
+  }
+
+  /** Continue on the welcome screen: read what landed with you, or get on with the turn. */
+  afterWelcome() {
+    if (this.s.arrivalReports.length) this.dealCards('arrival');
+    else this.dispatch({ type: 'continue' });
   }
 
   private dealCards(source: 'arrival' | 'news') {
@@ -372,8 +380,9 @@ class GameStore {
     }
     if (s.phase === 'arrival') {
       if (this.screen !== 'dispatch' && this.screen !== 'arrival') play('arrive');
-      // a quiet landing has nothing to deal and goes straight to the welcome screen
-      if (s.arrivalReports.length) this.dealCards('arrival');
+      // You land first and read the paperwork afterwards. A departure pile is the other way
+      // round: there is no planet to be welcomed to, so its cards are dealt straight away.
+      if (this.co.arrivalPending) this.dealCards('arrival');
       else this.screen = 'arrival';
       this.autosave();
       return;

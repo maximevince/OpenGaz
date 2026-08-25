@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * "Welcome to «planet»" — the end of the arrival sequence, after the dispatch cards have been
-   * read. The planet's theme starts here, which is what the original used this screen for.
+   * "Welcome to «planet»" — the landing itself, before the dispatch cards that came down with
+   * you. The planet's theme starts here, which is what the original used this screen for.
    */
   import { PLANET_BY_ID } from '../../engine';
   import { img } from '../assets';
@@ -15,9 +15,10 @@
 
 <div class="arr" style:background-image={large ? `url(${large})` : undefined}>
   <div class="welcome">Welcome to {PLANET_BY_ID[p.id].name}</div>
+  <div class="tagline">{PLANET_BY_ID[p.id].tagline}</div>
   <div class="who">{co.name} — week {s.week}</div>
   <div class="buttons">
-    <Btn color="black" onclick={() => game.dispatch({ type: 'continue' })}>Continue</Btn>
+    <Btn color="black" onclick={() => game.afterWelcome()}>Continue</Btn>
   </div>
 </div>
 
@@ -42,6 +43,15 @@
       2px 2px 0 #000,
       0 0 12px #8080ff;
     text-align: center;
+  }
+  .tagline {
+    font:
+      italic 14px Georgia,
+      serif;
+    color: #d0d0ff;
+    text-shadow: 1px 1px 0 #000;
+    text-align: center;
+    margin-top: -4px;
   }
   .who {
     margin-bottom: auto;
