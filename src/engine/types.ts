@@ -177,6 +177,8 @@ export interface LogEntry {
   text: string;
   /** the company this entry is *about*, when that is someone other than its owner */
   about?: number;
+  /** headline for the dispatch card this entry becomes; the text alone is the body */
+  header?: string;
 }
 
 export interface PendingEvent {

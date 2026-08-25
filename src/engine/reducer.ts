@@ -98,17 +98,26 @@ function log(state: GameState, company: number, kind: LogEntry['kind'], text: st
   return pushLog(state, { week: state.week, company, kind, text });
 }
 
-function report(state: GameState, kind: LogEntry['kind'], text: string): void {
-  state.arrivalReports.push(log(state, currentIndex(state), kind, text));
+function report(state: GameState, kind: LogEntry['kind'], text: string, header?: string): void {
+  const entry = log(state, currentIndex(state), kind, text);
+  if (header) entry.header = header;
+  state.arrivalReports.push(entry);
 }
 
 /**
  * A report about somebody else — a rival landing before you, a rival winning the auction. The
  * subject is carried so the UI can put that company's face and theme to the line.
  */
-function reportAbout(state: GameState, about: number, kind: LogEntry['kind'], text: string): void {
+function reportAbout(
+  state: GameState,
+  about: number,
+  kind: LogEntry['kind'],
+  text: string,
+  header?: string,
+): void {
   const entry = log(state, currentIndex(state), kind, text);
   entry.about = about;
+  if (header) entry.header = header;
   state.arrivalReports.push(entry);
 }
 
@@ -603,7 +612,7 @@ function finishDeparture(state: GameState, co: CompanyState, r: Rng): void {
   state.travel = null;
 
   const pname = PLANET_BY_ID[state.planets[to]!.id].name;
-  report(state, 'info', `Course set for ${pname}.`);
+  report(state, 'info', `Course set for ${pname}.`, 'Course Set');
   log(state, ci, 'info', `${co.name} left ${PLANET_BY_ID[state.planets[from]!.id].name}.`);
   state.awaitingHandoff = true;
   state.phase = 'arrival';
@@ -687,6 +696,7 @@ function enterTurn(state: GameState): void {
         state,
         'bad',
         `${PLANET_BY_ID[p.id].exchange} has crashed. Your shares in it are worthless.`,
+        `${PLANET_BY_ID[p.id].exchange} Has Crashed`,
       );
     }
     if (firstHuman) {
@@ -700,7 +710,8 @@ function enterTurn(state: GameState): void {
     report(
       state,
       'bad',
-      `Sabotage! Someone arranged a series of accidents for your company: ${fmt(amount)} kubars of damage.${loaned ? " The Trader's Union covered what you could not." : ''}`,
+      `Someone arranged a series of accidents for your company: ${fmt(amount)} kubars of damage.${loaned ? " The Trader's Union covered what you could not." : ''}`,
+      'Sabotage!',
     );
     co.sabotageDamage = 0;
   }
@@ -712,11 +723,14 @@ function enterTurn(state: GameState): void {
       winner && winner.code > 0 && winner.highBid > 0 && winner.highCompany !== ci
         ? winner.highCompany
         : -1;
-    if (byRival >= 0) reportAbout(state, byRival, 'info', auctionNews);
-    else report(state, 'info', auctionNews);
+    const auctionHeader =
+      byRival >= 0 ? `${state.companies[byRival]!.name} Wins the Auction` : 'Auction Results';
+    if (byRival >= 0) reportAbout(state, byRival, 'info', auctionNews, auctionHeader);
+    else report(state, 'info', auctionNews, auctionHeader);
   }
 
-  if (co.arrivalPending) {
+  const landed = co.arrivalPending;
+  if (landed) {
     co.arrivalPending = false;
     arriveOnPlanet(state, co, ci);
   }
@@ -727,7 +741,9 @@ function enterTurn(state: GameState): void {
   state.awaitingHandoff = false;
   // the lesson is owed per player per week, but never in a rest week
   state.tutorPending = state.settings.tutorial && !isRestWeek(state.week);
-  state.phase = state.arrivalReports.length ? 'arrival' : 'onPlanet';
+  // Landing always ends at the welcome screen, even on a week when nothing happened — that
+  // screen is where the planet's theme plays, and the original showed it every time.
+  state.phase = landed || state.arrivalReports.length ? 'arrival' : 'onPlanet';
 }
 
 /**
@@ -737,30 +753,42 @@ function enterTurn(state: GameState): void {
 function reportNeighbours(state: GameState, co: CompanyState, ci: number): void {
   const here = co.planet;
   const pname = PLANET_BY_ID[state.planets[here]!.id].name;
+  const beatMeHere = (oi: number) => {
+    const other = state.companies[oi]!;
+    if (oi === ci || other.bankrupt) return false;
+    return companyLocation(state, oi) === here && hasFlownThisWeek(state, oi);
+  };
+
+  // humans first, then rivals — the order the original deals these cards in. One loop in company
+  // order gives the same answer today only because humans hold the low indices; say it outright.
+  for (let oi = 0; oi < state.companies.length; oi++) {
+    const other = state.companies[oi]!;
+    if (other.isAI || !beatMeHere(oi)) continue;
+    reportAbout(
+      state,
+      oi,
+      'warn',
+      `${other.name} touched down on ${pname} before you and has already had the pick of the market.`,
+      `${other.name} Arrives on ${pname} First!`,
+    );
+  }
+
   let n = 0;
   for (let oi = 0; oi < state.companies.length; oi++) {
     const other = state.companies[oi]!;
-    if (oi === ci || other.bankrupt) continue;
-    if (companyLocation(state, oi) !== here || !hasFlownThisWeek(state, oi)) continue;
-    if (other.isAI) {
-      const taunt = RIVAL_TAUNTS[(co.random + n) % RIVAL_TAUNTS.length]!;
-      const hold =
-        other.aiTag && other.aiCargo > 0
-          ? `, holds full of ${fmt(other.aiCargo)} tons of ${COMMODITY_BY_ID[other.aiTag].name}`
-          : ', holds empty';
-      reportAbout(
-        state,
-        oi,
-        'info',
-        `${other.name} is already parked on ${pname}${hold}. ${taunt}`,
-      );
-    } else {
-      report(
-        state,
-        'warn',
-        `${other.name} touched down on ${pname} before you and has already had the pick of the market.`,
-      );
-    }
+    if (!other.isAI || !beatMeHere(oi)) continue;
+    const taunt = RIVAL_TAUNTS[(co.random + n) % RIVAL_TAUNTS.length]!;
+    const hold =
+      other.aiTag && other.aiCargo > 0
+        ? `, holds full of ${fmt(other.aiCargo)} tons of ${COMMODITY_BY_ID[other.aiTag].name}`
+        : ', holds empty';
+    reportAbout(
+      state,
+      oi,
+      'info',
+      `${other.name} is already parked on ${pname}${hold}. ${taunt}`,
+      `${other.name} arrives on ${pname}`,
+    );
     n++;
   }
 }
@@ -768,8 +796,6 @@ function reportNeighbours(state: GameState, co: CompanyState, ci: number): void 
 /** Arrival charges: import tariff, then facility fees paid and collected. */
 function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
   const p = state.planets[co.planet]!;
-  const pname = PLANET_BY_ID[p.id].name;
-  report(state, 'info', `You touch down on ${pname}.`);
   reportNeighbours(state, co, ci);
 
   // import tariff — only assessed if you already owe something (a quirk of the original)
@@ -777,7 +803,12 @@ function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
     const tax = Math.floor((cargoMarketValue(co, p) * state.econ.importTariff) / 100);
     if (tax > 0) {
       co.taxOwedTariff += tax;
-      report(state, 'info', `Import tariff of ${fmt(tax)} kubars assessed on your cargo.`);
+      report(
+        state,
+        'info',
+        `Import tariff of ${fmt(tax)} kubars assessed on your cargo.`,
+        'Import Tariff',
+      );
     }
   }
   if (!unlocked(state, 'facility')) return; // no landing fees before the auctions are explained
@@ -789,16 +820,19 @@ function arriveOnPlanet(state: GameState, co: CompanyState, ci: number): void {
           state,
           'good',
           `Your ${f.name} here has collected ${fmt(f.revenue)} kubars in landing fees.`,
+          `Landing Fees — ${f.name}`,
         );
         f.revenue = 0;
       }
     } else if (f.owner >= 0) {
       forcePay(state, co, f.fee, `the ${f.name} landing fee`);
       f.revenue += f.fee;
-      report(
+      reportAbout(
         state,
+        f.owner,
         'bad',
         `${state.companies[f.owner]!.name} charged you ${fmt(f.fee)} kubars to land at the ${f.name}.`,
+        `Landing Fee — ${f.name}`,
       );
     }
   }
@@ -825,9 +859,14 @@ function declareBankrupt(state: GameState, co: CompanyState, ci: number): void {
   co.arrivalPending = false;
   state.awaitingHandoff = true;
   state.phase = 'arrival';
-  state.arrivalReports = [
-    log(state, ci, 'bad', "Your company is bankrupt. The Trader's Union has seized your ship."),
-  ];
+  const note = log(
+    state,
+    ci,
+    'bad',
+    "Your company is bankrupt. The Trader's Union has seized your ship.",
+  );
+  note.header = 'Bankrupt';
+  state.arrivalReports = [note];
 }
 
 /* --------------------------------------------------------------- tutorial */
