@@ -37,6 +37,12 @@
 
   const quick = $derived(shortcuts.on(co.id, 'buy'));
 
+  /* The original lists only goods you can act on: stock for sale here, or tons in your hold to
+     sell. A commodity with neither is left out rather than shown as an untouchable zero row. */
+  const rows = $derived(
+    game.s.commodities.filter((c) => (p.stock[c] ?? 0) > 0 || (co.cargo[c]?.tons ?? 0) > 0),
+  );
+
   /** Quick Buy: one click trades. Sell the lot if you hold it, otherwise buy all you can. */
   function quickTrade(c: CommodityId) {
     const held = maxSell(c);
@@ -104,7 +110,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each game.s.commodities as c (c)}
+        {#each rows as c (c)}
           {@const def = COMMODITY_BY_ID[c]}
           {@const range = priceRange(def, levelOf(game.s).difficulty)}
           <tr
@@ -123,6 +129,11 @@
             <td>{range.min} - {range.max}</td>
           </tr>
         {/each}
+        {#if rows.length === 0}
+          <tr class="none"
+            ><td colspan="6">Nothing for sale here, and nothing aboard to sell.</td></tr
+          >
+        {/if}
       </tbody>
     </table>
   </div>
@@ -238,18 +249,19 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+    background: var(--c-face);
   }
   table {
     border-collapse: collapse;
     width: 100%;
-    height: 100%;
     font: bold 11px/1.15 var(--font-ui);
     background: var(--c-green-grid);
   }
   th,
   td {
     border: 1px solid #000;
-    padding: 1px 4px;
+    /* 21px cell + 1px rule = the original's 22px row pitch at 640x480 */
+    padding: 3px 4px;
     text-align: center;
   }
   th {
@@ -271,6 +283,14 @@
   }
   tbody tr {
     cursor: pointer;
+  }
+  tbody tr.none {
+    cursor: default;
+  }
+  tbody tr.none td {
+    text-align: center;
+    font-weight: normal;
+    padding: 6px;
   }
   tbody tr:hover td {
     background: #c0ffc0;
