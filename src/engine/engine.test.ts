@@ -33,6 +33,7 @@ import {
   opponentTravelTime,
   priceForSupply,
   priceRange,
+  rivalNews,
   serialize,
   stepStockMarket,
   subtractCash,
@@ -802,5 +803,68 @@ describe('cargo', () => {
     expect(() =>
       applyAction(s, { type: 'buy', commodity: c, tons: human(s).ship.cargo + 1 }),
     ).toThrow(ActionError);
+  });
+});
+
+describe('dispatch cards', () => {
+  /**
+   * The arrival reports are dealt one at a time, so each one has to say who it is about and
+   * carry its own headline. The order is the original's: whoever beat you here first, then the
+   * rivals parked on the pad.
+   */
+  const landingBehind = () => {
+    const s = newGame({
+      seed: 'dispatch',
+      level: 'novice',
+      humans: [
+        { name: 'One', ship: 1 },
+        { name: 'Two', ship: 2 },
+      ],
+      ai: 3,
+    });
+    const here = s.companies[1]!.planet;
+    s.companies[0]!.planetLast = here; // spent this week here, and has already flown on
+    s.companies[0]!.planet = (here + 1) % 7;
+    for (const c of s.companies) if (c.isAI) c.planet = here;
+    s.order = [0, 1];
+    s.turnIndex = 0;
+    s.companies[1]!.arrivalPending = true;
+    s.phase = 'arrival';
+    s.awaitingHandoff = true;
+    s.arrivalReports = [{ week: s.week, company: 0, kind: 'info', text: 'over to you' }];
+    return applyAction(s, { type: 'continue' });
+  };
+
+  it('names the company each neighbour report is about, and headlines it', () => {
+    const s = landingBehind();
+    const neighbours = s.arrivalReports.filter((r) => r.about !== undefined);
+    expect(neighbours.length).toBeGreaterThan(1);
+    for (const r of neighbours) expect(r.header).toBeTruthy();
+    expect(neighbours.some((r) => s.companies[r.about!]!.isAI)).toBe(true);
+    expect(neighbours.some((r) => !s.companies[r.about!]!.isAI)).toBe(true);
+  });
+
+  // The order used to fall out of the company array happening to hold humans first; it is now
+  // stated outright, so a change to that layout cannot quietly reshuffle the cards.
+  it('deals the humans who beat you here before the rivals parked on it', () => {
+    const s = landingBehind();
+    const kinds = s.arrivalReports
+      .filter((r) => r.about !== undefined)
+      .map((r) => s.companies[r.about!]!.isAI);
+    expect(kinds.indexOf(false)).toBeLessThan(kinds.indexOf(true));
+    expect(kinds.lastIndexOf(false)).toBeLessThan(kinds.indexOf(true));
+  });
+
+  it('picks out the week’s rival news and leaves the rest of the ticker alone', () => {
+    const s = base();
+    s.week = 9;
+    s.log.push(
+      { week: 9, company: -1, kind: 'news', text: 'weather on Hork' },
+      { week: 9, company: -1, kind: 'news', text: 'a rival buys a ship', about: 1 },
+      { week: 8, company: -1, kind: 'news', text: 'last week, still about a rival', about: 2 },
+      { week: 9, company: 0, kind: 'good', text: 'your own log line', about: 1 },
+    );
+    const cards = rivalNews(s);
+    expect(cards.map((c) => c.text)).toEqual(['a rival buys a ship']);
   });
 });

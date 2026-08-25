@@ -9,10 +9,21 @@ import { LEVEL_BY_ID } from './data/levels';
 import { PLANET_BY_ID } from './data/planets';
 import { fmt, refreshPlanetPrices, rollAvailability } from './economy';
 import type { Rng } from './rng';
-import type { GameState, PlanetState } from './types';
+import type { GameState, LogEntry, PlanetState } from './types';
 
-function news(state: GameState, text: string): void {
-  state.log.push({ week: state.week, company: -1, kind: 'news', text });
+/** `about` names the rival a line concerns; see the note on the same helper in ai.ts. */
+function news(state: GameState, text: string, about?: number, header?: string): void {
+  state.log.push({ week: state.week, company: -1, kind: 'news', text, about, header });
+}
+
+/**
+ * This week's world news that is *about* a rival — the lines the rollover deals out as cards,
+ * each with its company's portrait and theme, before the next turn starts.
+ */
+export function rivalNews(state: GameState): LogEntry[] {
+  return state.log.filter(
+    (l) => l.company === -1 && l.week === state.week && l.about !== undefined,
+  );
 }
 
 /* ------------------------------------------------------------ stock market */
@@ -258,21 +269,32 @@ const TICKER_BAD = new Set([
 export function opponentEvents(state: GameState, r: Rng): void {
   const ais = state.companies.map((c, i) => (c.isAI ? i : -1)).filter((i) => i >= 0);
   if (!ais.length) return;
-  const co = state.companies[ais[r.fint(0, ais.length - 1)]!]!;
+  const ci = ais[r.fint(0, ais.length - 1)]!;
+  const co = state.companies[ci]!;
   const e = r.fint(1, 108);
   if (e === 10 || e === 18) {
     co.ship.kuarps += 1;
-    return news(state, `${co.name} has fitted a faster engine.`);
+    return news(state, `${co.name} has fitted a faster engine.`, ci, `${co.name} Buys an Engine`);
   }
   if (TICKER_GOOD.has(e)) {
     const x = 2 * r.fint(25, 75) * co.ship.tons;
     co.cash += x;
-    return news(state, `${co.name} reports an excellent week: ${fmt(x)} kubars to the good.`);
+    return news(
+      state,
+      `${co.name} reports an excellent week: ${fmt(x)} kubars to the good.`,
+      ci,
+      `A Good Week for ${co.name}`,
+    );
   }
   if (TICKER_BAD.has(e)) {
     const x = r.fint(25, 75) * co.ship.tons;
     co.cash -= x;
-    return news(state, `${co.name} has had a costly week: ${fmt(x)} kubars written off.`);
+    return news(
+      state,
+      `${co.name} has had a costly week: ${fmt(x)} kubars written off.`,
+      ci,
+      `A Bad Week for ${co.name}`,
+    );
   }
 }
 

@@ -15,8 +15,12 @@ import { fmt, netWorth, opponentTravelTime, distanceBetween } from './economy';
 import type { Rng } from './rng';
 import type { CompanyState, GameState } from './types';
 
-function news(state: GameState, text: string): void {
-  state.log.push({ week: state.week, company: -1, kind: 'news', text });
+/**
+ * World news. `about` names the rival it concerns, which is what turns the line into a dispatch
+ * card at the rollover — its portrait, its theme — instead of one more line in the ticker.
+ */
+function news(state: GameState, text: string, about?: number, header?: string): void {
+  state.log.push({ week: state.week, company: -1, kind: 'news', text, about, header });
 }
 
 const aiDef = (co: CompanyState) => OPPONENTS[co.aiIndex - 1] ?? OPPONENTS[0]!;
@@ -36,8 +40,8 @@ export function runOpponents(state: GameState, r: Rng): void {
     opponentFacilities(state, co, i);
     opponentBuySell(state, co);
     if (state.week >= 15) opponentStock(state, co, R);
-    const shown = opponentBuysEngine(state, co, r);
-    if (state.week > 4 && !shown) opponentBuysShip(state, co, r);
+    const shown = opponentBuysEngine(state, co, i, r);
+    if (state.week > 4 && !shown) opponentBuysShip(state, co, i, r);
     if (co.cash > 0) opponentCashGrowth(state, co);
     if (state.week >= 3) opponentWeeklyCost(state, co);
   }
@@ -127,7 +131,7 @@ function opponentStock(state: GameState, co: CompanyState, R: number): void {
 /* ------------------------------------------------------------ ships, engines */
 
 /** Pyke: 3-in-4. Xeen: 1-in-6. Cost 5,000-25,000. */
-function opponentBuysEngine(state: GameState, co: CompanyState, r: Rng): boolean {
+function opponentBuysEngine(state: GameState, co: CompanyState, ci: number, r: Rng): boolean {
   const world = PLANET_BY_ID[state.planets[co.planet]!.id];
   const cost = r.fint(5000, 25000);
   const onPyke = world.id === 'pyke';
@@ -135,7 +139,12 @@ function opponentBuysEngine(state: GameState, co: CompanyState, r: Rng): boolean
   if (onPyke && r.fint(1, 4) !== 1) {
     co.ship.kuarps += 1;
     co.cash -= cost;
-    news(state, `${co.name} calls at Pyke and fits a faster ${co.ship.kuarps}-kuarp engine.`);
+    news(
+      state,
+      `${co.name} calls at Pyke and fits a faster ${co.ship.kuarps}-kuarp engine.`,
+      ci,
+      `${co.name} Buys an Engine`,
+    );
     return true;
   }
   if (onXeen && r.fint(1, 4) === 1 && r.fint(1, 3) !== 1) {
@@ -144,6 +153,8 @@ function opponentBuysEngine(state: GameState, co: CompanyState, r: Rng): boolean
     news(
       state,
       `${co.name} has a Xeen mechanic turbocharge its engine to ${co.ship.kuarps} kuarps.`,
+      ci,
+      `${co.name} Buys an Engine`,
     );
     return true;
   }
@@ -151,7 +162,7 @@ function opponentBuysEngine(state: GameState, co: CompanyState, r: Rng): boolean
 }
 
 /** Base odds only in the original — no level tables, no catch-up target. */
-function opponentBuysShip(state: GameState, co: CompanyState, r: Rng): boolean {
+function opponentBuysShip(state: GameState, co: CompanyState, ci: number, r: Rng): boolean {
   const humans = state.companies.filter((c) => !c.isAI);
   if (!humans.length) return false;
   const avg = Math.floor(humans.reduce((s, c) => s + c.ship.tons, 0) / humans.length);
@@ -165,6 +176,8 @@ function opponentBuysShip(state: GameState, co: CompanyState, r: Rng): boolean {
   news(
     state,
     `${co.name} buys a ${co.ship.tons}-ton ship from the Traders' Union for ${fmt(cost)} kubars.`,
+    ci,
+    `${co.name} Buys a Ship`,
   );
   return true;
 }
