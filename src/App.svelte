@@ -6,6 +6,7 @@
   import { game } from './ui/game.svelte';
   import Title from './ui/screens/Title.svelte';
   import Travel from './ui/screens/Travel.svelte';
+  import WeekChart from './ui/screens/WeekChart.svelte';
   import Setup from './ui/screens/Setup.svelte';
   import Handoff from './ui/screens/Handoff.svelte';
   import Report from './ui/screens/Report.svelte';
@@ -76,6 +77,7 @@
     map: Map,
     charts: Charts,
     travel: Travel,
+    weekchart: WeekChart,
     event: Event,
     dispatch: Dispatch,
     arrival: Arrival,
