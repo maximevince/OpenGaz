@@ -11,7 +11,16 @@
   import { game } from '../game.svelte';
 
   const s = $derived(game.s);
-  const p = $derived(game.planet);
+  /**
+   * The ground the card is read on. A departure pile is read while you are still parked on the
+   * planet you are leaving — the engine has already moved the company to its destination, so
+   * that one has to be looked up behind it.
+   */
+  const p = $derived(
+    game.cardSource === 'arrival' && game.co.arrivalPending
+      ? (s.planets[game.co.planetLast] ?? game.planet)
+      : game.planet,
+  );
   const large = $derived(img(`planet.${p.id}.large`));
   const card = $derived(game.card);
   const rival = $derived(game.cardRival);
