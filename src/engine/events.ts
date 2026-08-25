@@ -33,6 +33,8 @@ export interface EventCtx {
   /** ship mass class */
   T: number;
   report: (kind: LogEntry['kind'], text: string) => void;
+  /** the same, minus the dispatch card: for what a dialog has already put on screen */
+  chronicle: (kind: LogEntry['kind'], text: string) => void;
   /** post the pending dialog for event `id` */
   ask: (id: number, ev: Omit<PendingEvent, 'context' | 'id'>) => void;
   /** subtract_cash + a text suffix describing where the money came from */
@@ -62,6 +64,9 @@ function makeCtx(
       const e: LogEntry = { week: state.week, company: ci, kind, text };
       state.log.push(e);
       state.arrivalReports.push(e);
+    },
+    chronicle: (kind, text) => {
+      state.log.push({ week: state.week, company: ci, kind, text });
     },
     ask: (id, ev) => {
       state.pending = { ...ev, id: `ev:${id}`, context: 'travel' };
@@ -1607,7 +1612,11 @@ const yn = (yes = 'Yes', no = 'No') => [
   { id: 'no', label: no },
 ];
 
-/** OK-only dialog whose effect has already been applied. */
+/**
+ * OK-only dialog whose effect has already been applied. The dialog is the telling of it —
+ * with the character's face on it — so the trip's card pile does not repeat the same words
+ * at the far end; the log still keeps the entry.
+ */
 function note(
   c: EventCtx,
   id: number,
@@ -1616,7 +1625,7 @@ function note(
   portrait: string | undefined,
   text: string,
 ): void {
-  c.report(mood === 'bad' ? 'bad' : mood === 'good' ? 'good' : 'info', text);
+  c.chronicle(mood === 'bad' ? 'bad' : mood === 'good' ? 'good' : 'info', text);
   c.ask(id, { title, text, choices: [], portrait, mood });
 }
 
