@@ -135,6 +135,7 @@ const SIMPLE_SCREENS = [
   'report',
   'handoff',
   'arrival',
+  'dispatch',
   'travel',
 ];
 
@@ -160,6 +161,16 @@ const scenarios = [
     setup: `${BOOT}; opengaz.game.go('${screen}')`,
   })),
   { name: 'event', setup: `${BOOT}; ${PENDING}; opengaz.game.go('event')` },
+  {
+    // a dispatch card about a rival: portrait, headline and body all at once
+    name: 'dispatch:rival',
+    setup: `${BOOT}
+      const s4 = structuredClone(opengaz.game.state);
+      s4.arrivalReports[0].about = s4.companies.findIndex((c) => c.isAI);
+      s4.arrivalReports[0].header = 'Vandergriff Ltd. arrives on Gazillion Prime';
+      opengaz.game.state = s4;
+      opengaz.game.go('dispatch')`,
+  },
   {
     name: 'gameover',
     setup: `${BOOT}
