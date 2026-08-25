@@ -6,6 +6,10 @@
  * it again. Nothing loops: a 24-second cue running all turn wears out its welcome long before
  * the turn ends.
  *
+ * A rival's theme is a track like any other, not a layer over one: a dispatch card puts its
+ * company's face on screen and its theme takes the channel, alone, the way the original's single
+ * audio channel forced it to be.
+ *
  * Separate from `sound.ts` because the two behave differently — an effect is a one-shot that cuts
  * off whatever came before, a track plays under the game and has to get out of the way when an
  * effect fires. Two `<audio>` elements are kept so a planet change can fade across rather than cut.
@@ -16,7 +20,7 @@ import { musicOn, onAudioModeChange } from './audio';
 
 /** Under the game rather than over it, since it plays on past the screen that started it. */
 const VOLUME = 0.4;
-/** How far music ducks while an effect or a sting is playing. */
+/** How far music ducks while an effect is playing. */
 const DUCK = 0.35;
 const FADE_MS = 700;
 const STEP_MS = 40;
@@ -32,9 +36,7 @@ interface Deck {
 const decks: Deck[] = [];
 let front = 0;
 let ducked = false;
-let stinging = false;
 let wanted: string | null = null;
-let stingEl: HTMLAudioElement | undefined;
 
 function deck(i: number): Deck | undefined {
   if (typeof Audio === 'undefined') return undefined;
@@ -51,7 +53,7 @@ function deck(i: number): Deck | undefined {
   return decks[i];
 }
 
-const target = () => (ducked || stinging ? VOLUME * DUCK : VOLUME);
+const target = () => (ducked ? VOLUME * DUCK : VOLUME);
 
 function ramp(d: Deck, to: number, done?: () => void) {
   if (d.fade) window.clearInterval(d.fade);
@@ -131,43 +133,6 @@ function start(d: Deck, id: string) {
 
 /** The track that should be sounding, whether or not the setting currently allows it. */
 export const currentTrack = () => wanted;
-
-/**
- * A one-shot over the bed: a rival's theme when its card comes up, which is how the original used
- * them. The bed ducks for the length of it rather than stopping, and a second sting replaces the
- * first.
- */
-export function sting(id: string): void {
-  const url = music(id);
-  if (!url || !musicOn() || typeof Audio === 'undefined') return;
-  if (!stingEl) stingEl = new Audio();
-  const el = stingEl;
-  el.src = url;
-  el.currentTime = 0;
-  el.volume = VOLUME;
-  stinging = true;
-  const d = deck(front);
-  if (d?.id) ramp(d, target());
-  const done = () => {
-    stinging = false;
-    const cur = deck(front);
-    if (cur?.id && musicOn()) ramp(cur, target());
-  };
-  el.onended = done;
-  void el.play().catch(done);
-}
-
-/** Cut a sting short — a screen leaving takes its rival card with it. */
-export function stopSting(): void {
-  if (!stingEl) return;
-  stingEl.pause();
-  stingEl.currentTime = 0;
-  if (stinging) {
-    stinging = false;
-    const d = deck(front);
-    if (d?.id && musicOn()) ramp(d, target());
-  }
-}
 
 /** Pull music down while an effect plays, then let it back up. */
 export function duck(on: boolean): void {

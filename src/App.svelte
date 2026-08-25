@@ -31,6 +31,7 @@
   import Charts from './ui/screens/Charts.svelte';
   import Event from './ui/screens/Event.svelte';
   import Arrival from './ui/screens/Arrival.svelte';
+  import Dispatch from './ui/screens/Dispatch.svelte';
   import GameOver from './ui/screens/GameOver.svelte';
   import Lobby from './ui/screens/Lobby.svelte';
   import Waiting from './ui/screens/Waiting.svelte';
@@ -75,6 +76,7 @@
     charts: Charts,
     travel: Arrival,
     event: Event,
+    dispatch: Dispatch,
     arrival: Arrival,
     gameover: GameOver,
     lobby: Lobby,

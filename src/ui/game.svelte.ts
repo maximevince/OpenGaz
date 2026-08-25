@@ -4,7 +4,7 @@
  */
 import { online } from '../net/online.svelte';
 import { play } from './sound';
-import { setTrack, stopSting } from './music';
+import { currentTrack, setTrack } from './music';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
 import {
   ActionError,
@@ -18,9 +18,11 @@ import {
   LEVEL_BY_ID,
   newGame,
   priceRange,
+  rivalNews,
   serialize,
   type Action,
   type GameState,
+  type LogEntry,
   type NewGameOptions,
 } from '../engine';
 
@@ -54,6 +56,7 @@ export type Screen =
   | 'charts'
   | 'travel'
   | 'event'
+  | 'dispatch'
   | 'arrival'
   | 'lobby'
   | 'waiting'
@@ -90,6 +93,11 @@ class GameStore {
   private shownCompany = -1;
   /** last week whose standings report has been shown (once per week, not per player) */
   private reportedWeek = -1;
+  /** which dispatch card is showing, and which pile it came from */
+  cardIndex = $state(0);
+  cardSource = $state<'arrival' | 'news'>('arrival');
+  /** last week whose rival news has been dealt out (the pile is global, so once per week) */
+  private newsShownWeek = -1;
 
   constructor() {
     online.onRemoteAction = (a) => this.applyRemote(a);
@@ -109,6 +117,7 @@ class GameStore {
     this.state = s;
     this.shownCompany = -1;
     this.reportedWeek = s.week;
+    this.newsShownWeek = s.week;
     this.afterChange();
   }
 
@@ -141,6 +150,48 @@ class GameStore {
     return this.s.planets[this.co.planet]!;
   }
 
+  /* ------------------------------------------------------------- dispatch cards */
+
+  /**
+   * The pile the dispatch screen is dealing from: this arrival's reports, or the week's rival
+   * news. One fact per card, the way the original showed them.
+   */
+  get cards(): LogEntry[] {
+    if (!this.state) return [];
+    return this.cardSource === 'news' ? rivalNews(this.state) : this.state.arrivalReports;
+  }
+  get card(): LogEntry | undefined {
+    return this.cards[this.cardIndex];
+  }
+  /** the rival a card is about, when it is about one — the face and the theme that go with it */
+  get cardRival() {
+    const about = this.card?.about;
+    const c = about === undefined ? undefined : this.state?.companies[about];
+    return c?.isAI && c.aiIndex > 0 ? c : undefined;
+  }
+
+  /** OK on a card: the next one, or on past the last of them. */
+  nextCard() {
+    if (this.cardIndex + 1 < this.cards.length) {
+      this.cardIndex++;
+      this.cueMusic();
+      return;
+    }
+    if (this.cardSource === 'news') {
+      this.afterChange(); // the news is dealt; route on to whatever this turn actually is
+      return;
+    }
+    // an arrival that ends the turn has no planet to welcome you to
+    if (this.s.awaitingHandoff) this.dispatch({ type: 'continue' });
+    else this.go('arrival');
+  }
+
+  private dealCards(source: 'arrival' | 'news') {
+    this.cardSource = source;
+    this.cardIndex = 0;
+    this.screen = 'dispatch';
+  }
+
   go(screen: Screen) {
     this.error = null;
     if (screen !== this.screen) play(SCREEN_SOUND[screen] ?? '', 0.7);
@@ -149,14 +200,14 @@ class GameStore {
   }
 
   /**
-   * Music follows the planet you are standing on, and stops outside a game.
+   * One track at a time, and only three things ever start one.
    *
-   * A theme plays once. Landing starts it and it carries on into the main menu; when it ends it
-   * stays ended. The two screens the original played music on — the welcome screen and Explore —
-   * are the two that will start it again if it has already finished.
+   * A rival's dispatch card takes the channel for its theme, solo — it is the only sound while
+   * that face is on screen. The welcome screen and Explore start the planet's theme, which plays
+   * once and carries on into the main menu; when it ends it stays ended. Every other screen
+   * leaves the channel alone, except to make sure a rival's theme does not follow its card out.
    */
   cueMusic() {
-    stopSting();
     if (!this.state || this.screen === 'title' || this.screen === 'setup') {
       setTrack(null);
       return;
@@ -169,8 +220,22 @@ class GameStore {
       setTrack(wonByHuman ? 'planet.loro' : null, { replay: true, cut: true });
       return;
     }
-    const opensWithMusic = this.screen === 'arrival' || this.screen === 'explore';
-    setTrack(`planet.${this.planet.id}`, { replay: opensWithMusic });
+    if (this.screen === 'dispatch') {
+      const rival = this.cardRival;
+      if (rival) setTrack(`op${rival.aiIndex}`, { replay: true, cut: true });
+      else this.dropRivalTheme();
+      return;
+    }
+    if (this.screen === 'arrival' || this.screen === 'explore') {
+      setTrack(`planet.${this.planet.id}`, { replay: true });
+      return;
+    }
+    this.dropRivalTheme();
+  }
+
+  /** A rival's theme belongs to its card. Anywhere else, cut it; leave a planet theme running. */
+  private dropRivalTheme() {
+    if (currentTrack()?.startsWith('op')) setTrack(null, { cut: true });
   }
 
   /** dismiss the weekly standings and route on to whatever comes next */
@@ -188,6 +253,7 @@ class GameStore {
     this.state = newGame(opts);
     this.shownCompany = -1;
     this.reportedWeek = this.state.week;
+    this.newsShownWeek = this.state.week;
     this.afterChange();
   }
 
@@ -257,6 +323,13 @@ class GameStore {
       this.autosave();
       return;
     }
+    // the rollover's rival news, dealt once for the week before anyone's turn starts
+    if (this.newsShownWeek !== s.week && rivalNews(s).length) {
+      this.newsShownWeek = s.week;
+      this.dealCards('news');
+      this.autosave();
+      return;
+    }
     // the week's lesson is owed before this player may act
     if (s.tutorPending && s.phase === 'onPlanet') {
       this.shownCompany = currentIndex(s);
@@ -271,8 +344,10 @@ class GameStore {
       return;
     }
     if (s.phase === 'arrival') {
-      if (this.screen !== 'arrival') play('arrive');
-      this.screen = 'arrival';
+      if (this.screen !== 'dispatch' && this.screen !== 'arrival') play('arrive');
+      // a quiet landing has nothing to deal and goes straight to the welcome screen
+      if (s.arrivalReports.length) this.dealCards('arrival');
+      else this.screen = 'arrival';
       this.autosave();
       return;
     }
@@ -293,7 +368,9 @@ class GameStore {
       if (
         [
           'event',
+          'dispatch',
           'arrival',
+          'report',
           'travel',
           'handoff',
           'gameover',
@@ -362,6 +439,7 @@ class GameStore {
       this.state = deserialize(j);
       this.shownCompany = -1;
       this.reportedWeek = this.state.week;
+      this.newsShownWeek = this.state.week;
       this.afterChange();
       return true;
     } catch (e) {
@@ -384,6 +462,7 @@ class GameStore {
       this.state = decodeFromLink(m[1]!);
       this.shownCompany = -1;
       this.reportedWeek = this.state.week;
+      this.newsShownWeek = this.state.week;
       history.replaceState(null, '', location.pathname);
       this.afterChange();
       return true;

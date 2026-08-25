@@ -1,49 +1,21 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  /**
+   * "Welcome to «planet»" — the end of the arrival sequence, after the dispatch cards have been
+   * read. The planet's theme starts here, which is what the original used this screen for.
+   */
   import { PLANET_BY_ID } from '../../engine';
   import { img } from '../assets';
   import Btn from '../components/Btn.svelte';
   import { game } from '../game.svelte';
-  import { sting } from '../music';
   const s = $derived(game.s);
   const co = $derived(game.co);
   const p = $derived(game.planet);
   const large = $derived(img(`planet.${p.id}.large`));
-  const news = $derived(s.log.filter((l) => l.company === -1 && l.week >= s.week - 1).slice(-3));
-
-  /** The rival a report is about, if any — the original played a company's theme with its card. */
-  const rival = $derived.by(() => {
-    for (const r of s.arrivalReports) {
-      const c = r.about === undefined ? undefined : s.companies[r.about];
-      if (c?.isAI && c.aiIndex > 0) return c;
-    }
-    return undefined;
-  });
-
-  onMount(() => {
-    if (rival) sting(`op${rival.aiIndex}`);
-  });
 </script>
 
 <div class="arr" style:background-image={large ? `url(${large})` : undefined}>
   <div class="welcome">Welcome to {PLANET_BY_ID[p.id].name}</div>
-  <div class="panel">
-    <div class="who">{co.name} — week {s.week}</div>
-    {#if s.arrivalReports.length === 0}
-      <div class="line info">An uneventful trip. Your pilot is almost disappointed.</div>
-    {/if}
-    {#each s.arrivalReports as r, i (i)}
-      <div class="line {r.kind}">{r.text}</div>
-    {/each}
-    {#if rival}
-      {@const face = img(`portrait.op${rival.aiIndex}`)}
-      {#if face}<img class="rival" src={face} alt={rival.name} />{/if}
-    {/if}
-    {#if news.length}
-      <div class="newshead">Kuku News</div>
-      {#each news as n, i (i)}<div class="line news">{n.text}</div>{/each}
-    {/if}
-  </div>
+  <div class="who">{co.name} — week {s.week}</div>
   <div class="buttons">
     <Btn color="black" onclick={() => game.dispatch({ type: 'continue' })}>Continue</Btn>
   </div>
@@ -60,14 +32,8 @@
     padding: 10px;
     box-sizing: border-box;
   }
-  .rival {
-    align-self: flex-end;
-    width: 96px;
-    image-rendering: pixelated;
-    border: 2px solid;
-    border-color: #404040 #fff #fff #404040;
-  }
   .welcome {
+    margin-top: auto;
     font:
       bold 30px Georgia,
       serif;
@@ -77,48 +43,12 @@
       0 0 12px #8080ff;
     text-align: center;
   }
-  .panel {
-    margin-top: auto;
-    max-height: 46%;
-    background: rgba(0, 0, 40, 0.85);
-    border: 2px solid #8080ff;
-    padding: 10px;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    color: #fff;
-    font: 13px var(--font-ui);
-  }
   .who {
-    font-weight: bold;
+    margin-bottom: auto;
+    text-align: center;
+    font: bold 14px var(--font-ui);
     color: var(--c-yellow-plate);
-  }
-  .line {
-    padding: 4px 8px;
-    border-left: 4px solid #808080;
-    background: rgba(255, 255, 255, 0.06);
-  }
-  .good {
-    border-color: #00c000;
-  }
-  .bad {
-    border-color: #ff4040;
-  }
-  .warn {
-    border-color: #ffc000;
-  }
-  .info {
-    border-color: #8080ff;
-  }
-  .newshead {
-    font-weight: bold;
-    color: var(--c-cyan);
-    margin-top: 6px;
-  }
-  .news {
-    border-color: var(--c-cyan);
-    font-style: italic;
+    text-shadow: 1px 1px 0 #000;
   }
   .buttons :global(.btn) {
     width: 100%;
