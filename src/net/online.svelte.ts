@@ -35,6 +35,9 @@ import {
 } from './chat';
 
 const APP_ID = 'opengaz-v1';
+/** The original seats seven companies: you plus six rivals, of which up to five may be human. */
+export const MAX_COMPANIES = 7;
+export const MAX_SEATS = 6;
 /** how long a join waits for the host to answer before calling it a failure */
 const JOIN_TIMEOUT_MS = 20_000;
 
@@ -172,7 +175,8 @@ class Online {
 
   /* ------------------------------------------------------------ connect */
 
-  host(playerName: string, level: Level = 'novice', ai = 3): void {
+  /** A fresh room is the original's table: the host and six computers, until humans sit in. */
+  host(playerName: string, level: Level = 'novice', ai = MAX_COMPANIES - 1): void {
     const code = makeCode();
     this.connect(code, playerName);
     this.lobby = {
@@ -477,16 +481,27 @@ class Online {
   updateLobby(patch: Partial<Pick<Lobby, 'ai' | 'level' | 'planets' | 'seed'>>): void {
     if (!this.isHost || !this.lobby) return;
     Object.assign(this.lobby, patch);
+    this.lobby.ai = Math.max(0, Math.min(this.lobby.ai, this.maxAi()));
     this.broadcastLobby();
   }
+  /** computer opponents the table still has room for */
+  maxAi(): number {
+    return MAX_COMPANIES - (this.lobby?.seats.length ?? 0);
+  }
+  /**
+   * A new seat takes a computer's place when the table is full, and a seat removed gives it
+   * back — as in the original, where the six rivals are there whether humans sit in for them
+   * or not. A host who asked for fewer computers keeps that number.
+   */
   addSeat(): void {
-    if (!this.isHost || !this.lobby || this.lobby.seats.length >= 6) return;
+    if (!this.isHost || !this.lobby || this.lobby.seats.length >= MAX_SEATS) return;
     this.lobby.seats.push({
       name: randomCompanyName(nameRng(), { taken: this.seatNames() }),
       ship: 1 + (this.lobby.seats.length % 12),
       peer: null,
       player: '',
     });
+    this.lobby.ai = Math.min(this.lobby.ai, this.maxAi());
     this.broadcastLobby();
   }
   /** Company names already on the board, so a fresh one never duplicates. */
@@ -495,7 +510,9 @@ class Online {
   }
   removeSeat(i: number): void {
     if (!this.isHost || !this.lobby || this.lobby.seats.length <= 1) return;
+    const full = this.lobby.ai >= this.maxAi();
     this.lobby.seats.splice(i, 1);
+    if (full) this.lobby.ai = this.maxAi();
     this.broadcastLobby();
   }
   renameSeat(i: number, name: string, ship?: number): void {

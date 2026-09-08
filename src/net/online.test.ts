@@ -245,6 +245,32 @@ describe('lobby seats', () => {
     expect(online.lobby!.seats).toHaveLength(1);
     expect(net.sent.filter((m) => m.name === 'lobby')).not.toHaveLength(0);
   });
+
+  it('seats seven companies: a human seat takes a computer’s place and gives it back', () => {
+    online.host('Hosty');
+    expect(online.lobby!.ai).toBe(6);
+    online.addSeat();
+    online.addSeat();
+    expect(online.lobby!.ai).toBe(4);
+    online.removeSeat(2);
+    expect(online.lobby!.ai).toBe(5);
+    for (let i = 0; i < 10; i++) online.addSeat(); // stops at six seats
+    expect(online.lobby!.seats).toHaveLength(6);
+    expect(online.lobby!.ai).toBe(1);
+  });
+
+  it('keeps a smaller computer count the host asked for, within the table', () => {
+    online.host('Hosty');
+    online.updateLobby({ ai: 2 });
+    online.addSeat();
+    expect(online.lobby!.ai).toBe(2); // room to spare: nothing to give up
+    online.removeSeat(1);
+    expect(online.lobby!.ai).toBe(2); // the table was not full, so nothing comes back
+    online.updateLobby({ ai: 99 });
+    expect(online.lobby!.ai).toBe(6);
+    online.updateLobby({ ai: -4 });
+    expect(online.lobby!.ai).toBe(0);
+  });
 });
 
 describe('room chat', () => {

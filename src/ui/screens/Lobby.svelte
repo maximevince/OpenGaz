@@ -1,7 +1,10 @@
 <script lang="ts">
   import { LEVELS, Rng, SHIPS, randomPlayerName } from '../../engine';
-  import { online } from '../../net/online.svelte';
+  import { MAX_SEATS, online, type Seat } from '../../net/online.svelte';
+  import { colorOf } from '../charts';
   import Btn from '../components/Btn.svelte';
+  import ChatPanel from '../components/ChatPanel.svelte';
+  import ShipDialog from '../components/ShipDialog.svelte';
   import { game } from '../game.svelte';
 
   // placeholder identity only; a returning player keeps whatever they typed last time
@@ -9,9 +12,18 @@
   let name = $state(localStorage.getItem('opengaz.player') || randomPlayerName(nameRng));
   let code = $state(new URLSearchParams(location.search).get('room') ?? '');
   let copied = $state(false);
+  /** seat whose company name the host is typing over */
+  let renaming = $state<number | null>(null);
+  /** seat whose ship the host is choosing */
+  let shipFor = $state<number | null>(null);
   const lobby = $derived(online.lobby);
   const canStart = $derived(!!lobby && lobby.seats.some((s) => s.peer) && online.isHost);
   const unclaimed = $derived(lobby ? lobby.seats.filter((s) => !s.peer).length : 0);
+  const seated = $derived(online.mySeats().length > 0);
+
+  const shipName = (id: number) => SHIPS.find((x) => x.id === id)?.name ?? `ship ${id}`;
+  const who = (s: Seat) =>
+    s.peer ? (online.peers[s.peer] ?? s.player) : s.player ? `${s.player} (away)` : 'free';
 
   function remember() {
     localStorage.setItem('opengaz.player', name.trim());
@@ -32,6 +44,10 @@
       copied = false;
     }
   }
+  function leave() {
+    online.leave();
+    game.go('title');
+  }
   function start() {
     if (!lobby) return;
     // seats nobody took are dropped here: a company with no player would stall the turn order
@@ -45,6 +61,17 @@
       ai: lobby.ai,
     });
   }
+  /** the host typed a new company name (or left the field alone) */
+  function commitRename(i: number, value: string) {
+    const v = value.trim();
+    const s = lobby?.seats[i];
+    if (s && v && v !== s.name) online.renameSeat(i, v);
+    renaming = null;
+  }
+  const focus = (el: HTMLInputElement) => {
+    el.focus();
+    el.select();
+  };
 </script>
 
 <div class="lobby">
@@ -98,109 +125,129 @@
       <Btn onclick={() => online.leave()}>Cancel</Btn>
     </div>
   {:else if lobby}
-    <div class="box">
-      <div class="head">
-        <span
-          >Room <b class="code">{online.code}</b> · {online.isHost
-            ? 'you are the host'
-            : `host: ${online.peers[lobby.host] ?? '…'}`}</span
-        >
-        <Btn onclick={copy}>{copied ? 'Link copied!' : 'Copy invite link'}</Btn>
-      </div>
-      <h3>Seats (click one to take it)</h3>
-      <div class="seats">
-        {#each lobby.seats as s, i (i)}
-          <div class="seat" class:mine={s.peer === online.selfId}>
-            {#if online.isHost}
-              <input
-                class="cname"
-                value={s.name}
-                onchange={(e) => online.renameSeat(i, (e.target as HTMLInputElement).value)}
-              />
-              <select
-                value={s.ship}
-                onchange={(e) =>
-                  online.renameSeat(i, s.name, Number((e.target as HTMLSelectElement).value))}
-              >
-                {#each SHIPS as sh (sh.id)}<option value={sh.id}>{sh.name}</option>{/each}
-              </select>
-            {:else}
-              <span class="cname">{s.name} · {SHIPS.find((x) => x.id === s.ship)?.name}</span>
-            {/if}
-            <span class="who"
-              >{s.peer
-                ? (online.peers[s.peer] ?? s.player)
-                : s.player
-                  ? `${s.player} (away)`
-                  : 'free'}</span
-            >
-            {#if s.peer === online.selfId}
-              <Btn onclick={() => online.claimSeat(null)}>Leave seat</Btn>
-            {:else if !s.peer}
-              <Btn color="green" onclick={() => online.claimSeat(i)}>Take seat</Btn>
-            {/if}
-            {#if online.isHost && lobby.seats.length > 1}<Btn onclick={() => online.removeSeat(i)}
-                >−</Btn
-              >{/if}
-          </div>
-        {/each}
-        {#if online.isHost && lobby.seats.length < 6}<Btn onclick={() => online.addSeat()}
-            >+ add seat</Btn
-          >{/if}
-      </div>
-      <div class="opts">
-        <label
-          >Computer opponents
-          <input
-            type="number"
-            min="0"
-            max={7 - lobby.seats.length}
-            value={lobby.ai}
-            disabled={!online.isHost}
-            onchange={(e) =>
-              online.updateLobby({ ai: Number((e.target as HTMLInputElement).value) })}
-          />
-        </label>
-        <label
-          >Level
-          <select
-            value={lobby.level}
-            disabled={!online.isHost}
-            onchange={(e) =>
-              online.updateLobby({
-                level: (e.target as HTMLSelectElement).value as typeof lobby.level,
-              })}
+    <div class="box room">
+      <div class="main">
+        <div class="head">
+          <span class="roomname">Room <b class="code">{online.code}</b></span>
+          <span class="hosted"
+            >{online.isHost ? 'you are hosting' : `host: ${online.peers[lobby.host] ?? '…'}`}</span
           >
-            {#each LEVELS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-          </select>
-        </label>
-        <span>Players here: {Object.values(online.peers).join(', ')}</span>
+          <Btn onclick={copy}>{copied ? 'Link copied!' : 'Copy invite link'}</Btn>
+        </div>
+        <div class="seats">
+          {#each lobby.seats as s, i (i)}
+            <div class="seat" class:mine={s.peer === online.selfId}>
+              <span class="swatch" style:background={colorOf(i)}></span>
+              <div class="co">
+                {#if online.isHost && renaming === i}
+                  <input
+                    class="rename"
+                    value={s.name}
+                    maxlength="24"
+                    aria-label="Company name"
+                    use:focus
+                    onblur={(e) => commitRename(i, (e.target as HTMLInputElement).value)}
+                    onkeydown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter') commitRename(i, (e.target as HTMLInputElement).value);
+                      else if (e.key === 'Escape') renaming = null;
+                    }}
+                  />
+                {:else if online.isHost}
+                  <button
+                    class="edit name"
+                    title="Rename the company"
+                    onclick={() => (renaming = i)}>{s.name}</button
+                  >
+                {:else}
+                  <b class="name">{s.name}</b>
+                {/if}
+                <span class="dot">·</span>
+                {#if online.isHost}
+                  <button class="edit ship" title="Choose a ship" onclick={() => (shipFor = i)}
+                    >{shipName(s.ship)}</button
+                  >
+                {:else}
+                  <span class="ship">{shipName(s.ship)}</span>
+                {/if}
+              </div>
+              <span class="who" class:free={!s.peer}>{who(s)}</span>
+              <span class="act">
+                {#if s.peer === online.selfId}
+                  <Btn onclick={() => online.claimSeat(null)}>Leave seat</Btn>
+                {:else if !s.peer}
+                  <Btn color="green" onclick={() => online.claimSeat(i)}>Take seat</Btn>
+                {/if}
+                {#if online.isHost && lobby.seats.length > 1}
+                  <Btn title="Remove this seat" onclick={() => online.removeSeat(i)}>−</Btn>
+                {/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+        {#if online.isHost && lobby.seats.length < MAX_SEATS}
+          <button class="add" onclick={() => online.addSeat()}>+ add a seat</button>
+        {/if}
+        {#if !seated}<p class="note">Take a seat to play; without one you only watch.</p>{/if}
+        <div class="opts">
+          <label
+            >Computer opponents
+            <input
+              type="number"
+              min="0"
+              max={online.maxAi()}
+              value={lobby.ai}
+              disabled={!online.isHost}
+              onchange={(e) =>
+                online.updateLobby({ ai: Number((e.target as HTMLInputElement).value) })}
+            />
+          </label>
+          <label
+            >Level
+            <select
+              value={lobby.level}
+              disabled={!online.isHost}
+              onchange={(e) =>
+                online.updateLobby({
+                  level: (e.target as HTMLSelectElement).value as typeof lobby.level,
+                })}
+            >
+              {#each LEVELS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+            </select>
+          </label>
+        </div>
+        {#if online.notice}<p class="err">{online.notice}</p>{/if}
+        <div class="row">
+          <Btn onclick={leave}>Leave</Btn>
+          {#if online.isHost}
+            {#if unclaimed > 0}<span class="note"
+                >{unclaimed} empty seat{unclaimed > 1 ? 's' : ''} will be dropped at the start.</span
+              >{/if}
+            <Btn color="green" disabled={!canStart} onclick={start}>Start the game</Btn>
+          {:else}<span class="note">Waiting for the host to start…</span>{/if}
+        </div>
       </div>
-      {#if online.notice}<p class="err">{online.notice}</p>{/if}
-      <div class="row">
-        <Btn
-          onclick={() => {
-            online.leave();
-            game.go('title');
-          }}>Leave</Btn
-        >
-        {#if online.isHost}
-          {#if unclaimed > 0}<span class="note"
-              >{unclaimed} empty seat{unclaimed > 1 ? 's' : ''} will be dropped at the start.</span
-            >{/if}
-          <Btn color="green" disabled={!canStart} onclick={start}>Start the game</Btn>
-        {:else}<span class="note">Waiting for the host to start…</span>{/if}
+      <div class="side">
+        <h3>Chat</h3>
+        <ChatPanel />
       </div>
     </div>
+    {#if shipFor !== null && lobby.seats[shipFor]}
+      {@const s = lobby.seats[shipFor]!}
+      {@const i = shipFor}
+      <ShipDialog
+        title={`Choose a ship for ${s.name}`}
+        ship={s.ship}
+        onpick={(id) => online.renameSeat(i, s.name, id)}
+        onclose={() => (shipFor = null)}
+      />
+    {/if}
   {/if}
-  <div class="bottom">
-    <Btn
-      onclick={() => {
-        online.leave();
-        game.go('title');
-      }}>Back to title</Btn
-    >
-  </div>
+  {#if online.status !== 'lobby'}
+    <div class="bottom">
+      <Btn onclick={leave}>Back to title</Btn>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -244,6 +291,7 @@
   }
   .box {
     flex: 1;
+    min-height: 0;
     background: var(--c-face);
     border: 2px solid;
     border-color: #fff #404040 #404040 #fff;
@@ -282,51 +330,6 @@
     background: #fff;
     color: #000;
   }
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .code {
-    font-size: 18px;
-    letter-spacing: 2px;
-    background: var(--c-yellow-plate);
-    padding: 0 6px;
-  }
-  .seats {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .seat {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto auto;
-    gap: 6px;
-    align-items: center;
-    background: #fff;
-    padding: 4px;
-  }
-  .seat.mine {
-    background: var(--c-yellow-plate);
-  }
-  .cname {
-    font-weight: bold;
-  }
-  .who {
-    color: #404040;
-  }
-  .opts {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .row {
-    display: flex;
-    gap: 8px;
-    justify-content: space-between;
-    align-items: center;
-  }
   .note {
     font-size: 11px;
     color: #202020;
@@ -335,8 +338,173 @@
   .err {
     color: #800000;
     font-weight: bold;
+    margin: 0;
   }
   .bottom :global(.btn) {
     width: 100%;
+  }
+
+  /* --- the room: seats and settings on the left, the chat down the right ---------------- */
+  .room {
+    display: grid;
+    grid-template-columns: 1fr 236px;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .main {
+    min-height: 0;
+    min-width: 0;
+    /* only ever scrolls down: a long name is cut short, never given a sideways scrollbar */
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .side {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .roomname {
+    white-space: nowrap;
+  }
+  .code {
+    font-size: 17px;
+    letter-spacing: 2px;
+    background: var(--c-yellow-plate);
+    padding: 0 6px;
+  }
+  .hosted {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #404040;
+    font-size: 12px;
+  }
+  .seats {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .seat {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 6px;
+    row-gap: 1px;
+    align-items: center;
+    background: #fff;
+    padding: 3px 5px;
+  }
+  .seat.mine {
+    background: var(--c-yellow-plate);
+  }
+  .swatch {
+    grid-row: 1 / 3;
+    width: 10px;
+    height: 24px;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+  }
+  .co {
+    grid-column: 2 / 4;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .name {
+    font-weight: bold;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .co .ship {
+    flex: none;
+  }
+  .dot {
+    color: #808080;
+  }
+  .ship {
+    color: #202020;
+  }
+  /* the host's fields look like text until you go for them */
+  .edit {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    border-bottom: 1px dashed #808080;
+    padding: 0;
+    cursor: text;
+    min-width: 0;
+  }
+  .edit.ship {
+    cursor: pointer;
+  }
+  .edit:hover {
+    background: var(--c-cyan-plate);
+  }
+  .rename {
+    font: bold 13px var(--font-ui);
+    padding: 0 2px;
+    width: 180px;
+  }
+  .who {
+    grid-column: 2;
+    color: #404040;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .who.free {
+    font-style: italic;
+  }
+  .act {
+    grid-column: 3;
+    display: flex;
+    gap: 4px;
+  }
+  .act :global(.btn) {
+    font-size: 11px;
+    padding: 1px 6px;
+  }
+  .add {
+    align-self: flex-start;
+    font: 12px var(--font-ui);
+    color: #000080;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .opts {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .opts input {
+    width: 40px;
+  }
+  .row {
+    flex: none;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
   }
 </style>

@@ -231,6 +231,21 @@ const scenarios = [
   // overlay with the say-line open and with the history popup open
   { name: 'lobby:room', setup: `${ONLINE}; opengaz.game.go('lobby')` },
   {
+    // the host renaming a company and choosing its ship
+    name: 'lobby:rename',
+    setup: `${ONLINE}; opengaz.game.go('lobby'); await $$tick(); await $$click('.edit.name');`,
+  },
+  {
+    name: 'lobby:ship-dialog',
+    setup: `${ONLINE}; opengaz.game.go('lobby'); await $$tick(); await $$click('.edit.ship');`,
+  },
+  {
+    // a guest without a seat: plain rows, the hint to take one, "waiting for the host"
+    name: 'lobby:guest',
+    setup: `${ONLINE}; o.lobby.host = 'P2'; o.lobby.seats.forEach((s) => { if (s.peer === o.selfId) s.peer = null; });
+      opengaz.game.go('lobby')`,
+  },
+  {
     name: 'waiting:chat',
     setup: `${BOOT}; ${ONLINE}; o.status = 'playing'; opengaz.game.go('waiting')`,
   },
