@@ -1,6 +1,7 @@
 <script lang="ts">
   import Stage from './ui/Stage.svelte';
   import Toast from './ui/components/Toast.svelte';
+  import ChatOverlay from './ui/components/ChatOverlay.svelte';
   import HelpDialog from './ui/components/HelpDialog.svelte';
   import { initAssets } from './ui/assets';
   import { game } from './ui/game.svelte';
@@ -105,6 +106,7 @@
   {/if}
   <HelpDialog />
   <Toast />
+  <ChatOverlay />
 </Stage>
 
 <style>

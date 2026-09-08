@@ -32,6 +32,7 @@ const net = vi.hoisted(() => {
     sent,
     actions,
     callbacks,
+    room,
     joinRoom: (_cfg: unknown, _id: string, cb: typeof callbacks) => {
       sent.length = 0;
       actions.clear();
@@ -44,6 +45,7 @@ const net = vi.hoisted(() => {
 vi.mock('trystero/nostr', () => ({ selfId: 'SELF', joinRoom: net.joinRoom }));
 
 const { online } = await import('./online.svelte');
+type Lobby = import('./online.svelte').Lobby;
 
 const HOST = 'HOST';
 /** the game the room is playing: two humans, no rivals, so seat i drives company i */
@@ -242,5 +244,89 @@ describe('lobby seats', () => {
     expect(seats[0]!.peer).toBe('SELF');
     expect(online.lobby!.seats).toHaveLength(1);
     expect(net.sent.filter((m) => m.name === 'lobby')).not.toHaveLength(0);
+  });
+});
+
+describe('room chat', () => {
+  beforeEach(() => vi.spyOn(console, 'warn').mockImplementation(() => {}));
+  afterEach(() => {
+    online.leave();
+    vi.restoreAllMocks();
+  });
+  const said = () => online.chat.filter((m) => m.kind === 'say');
+  const notices = () => online.chat.filter((m) => m.kind === 'sys').map((m) => m.text);
+  const chatSent = () => net.sent.filter((m) => m.name === 'chat');
+
+  /** a guest sitting in the host's lobby, with a name on file for the host */
+  const seated = () => {
+    online.join('ABCDEF', 'Guest');
+    deliver('hello', { name: 'Hosty' }, HOST);
+    deliver('lobby', lobbyFor(fresh()), HOST);
+  };
+
+  it('names a line after the peer it came from, never after what it claims', () => {
+    seated();
+    deliver('chat', { text: 'hi there', name: 'Admin' }, HOST);
+    expect(said()).toHaveLength(1);
+    expect(said()[0]).toMatchObject({ name: 'Hosty', peer: HOST, seat: 0, text: 'hi there' });
+    expect(online.chatUnread).toBe(1);
+  });
+
+  it('cleans what arrives and drops what is left empty or over-long', () => {
+    seated();
+    deliver('chat', { text: '  spaced   out  ' }, HOST);
+    deliver('chat', { text: '   ' }, HOST);
+    deliver('chat', { text: 42 }, HOST);
+    deliver('chat', { text: 'y'.repeat(500) }, HOST);
+    expect(said().map((m) => m.text)).toEqual(['spaced out', 'y'.repeat(200)]);
+  });
+
+  it('ignores chat until the host has let us in', () => {
+    online.join('ABCDEF', 'Guest');
+    deliver('chat', { text: 'too early' }, HOST);
+    expect(said()).toHaveLength(0);
+  });
+
+  it('mutes a peer that floods', () => {
+    seated();
+    for (let i = 0; i < 20; i++) deliver('chat', { text: `spam ${i}` }, HOST);
+    expect(said().length).toBeLessThan(10);
+  });
+
+  it('sends what we say, cleaned, and shows it to us at once', () => {
+    seated();
+    expect(online.say('  hello   room ')).toBe(true);
+    expect(online.say('   ')).toBe(false);
+    expect(chatSent()).toEqual([{ name: 'chat', data: { text: 'hello room' }, target: undefined }]);
+    expect(said().at(-1)).toMatchObject({ name: 'Guest', peer: 'SELF', seat: 1 });
+    expect(online.chatUnread).toBe(0); // our own line is not news to us
+  });
+
+  it('tells the story of the lobby: joins, seats, settings, leaving', () => {
+    seated();
+    expect(notices()).toEqual(['Joined room ABCDEF. Take a seat, or wait for the host to start.']);
+    deliver('hello', { name: 'Nova' }, 'P3');
+    const l: Lobby = lobbyFor(fresh());
+    l.seats.push({ name: 'Third Co.', ship: 2, peer: null, player: '' });
+    deliver('lobby', l, HOST);
+    l.seats[2]!.peer = 'P3';
+    l.seats[2]!.player = 'Nova';
+    deliver('lobby', { ...l, ai: 2 }, HOST);
+    net.room.onPeerLeave!('P3');
+    expect(notices().slice(1)).toEqual([
+      'Nova joined',
+      'Hosty added seat 3 (Third Co.)',
+      'Nova took seat 3 (Third Co.)',
+      'Hosty set computer opponents to 2',
+      'Nova left',
+    ]);
+  });
+
+  it('is forgotten with the room', () => {
+    seated();
+    online.say('bye');
+    online.leave();
+    expect(online.chat).toEqual([]);
+    expect(online.chatUnread).toBe(0);
   });
 });

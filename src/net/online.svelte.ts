@@ -24,6 +24,15 @@ import {
   type Level,
   type PlanetId,
 } from '../engine';
+import {
+  CHAT_MAX,
+  expandTaunt,
+  flooding,
+  lobbyChanges,
+  sanitizeChat,
+  trimChat,
+  type ChatMsg,
+} from './chat';
 
 const APP_ID = 'opengaz-v1';
 /** how long a join waits for the host to answer before calling it a failure */
@@ -55,6 +64,8 @@ type Claim = { seat: number | null; name: string };
 /** `week`/`turn`/`rng` are the sender's state *after* applying `action` — our divergence check. */
 type Act = { action: Action; week: number; turn: number; rng: number; n: number };
 type Sync = { state: GameState; lobby: Lobby; seq: number };
+/** a chat line; the sender's name is looked up from the peer id, never read from here */
+type Say = { text: string };
 
 export type OnlineStatus = 'idle' | 'connecting' | 'lobby' | 'playing' | 'error';
 
@@ -87,6 +98,15 @@ class Online {
   private peerErrors: string[] = [];
   /** number of actions applied so far this game — one global counter, same on every peer */
   seq = 0;
+  /** the room's chat, newest last: what people said plus the lobby's own notices */
+  chat = $state<ChatMsg[]>([]);
+  /** lines that arrived while no chat was on screen — the UI clears it when it shows them */
+  chatUnread = $state(0);
+  private chatId = 0;
+  /** recent send times per peer, for the flood guard */
+  private chatStamps = new Map<string, number[]>();
+  /** the lobby as last announced, to say what changed when the next one arrives */
+  private lastLobby: Lobby | null = null;
 
   private room: Room | null = null;
   /** a snapshot has been asked for and not arrived yet (stops resync storms) */
@@ -102,10 +122,13 @@ class Online {
     act?: (d: Act) => Promise<void>;
     sync?: (d: Sync, o?: { target: string }) => Promise<void>;
     syncReq?: (d: Hello, o?: { target: string }) => Promise<void>;
+    chat?: (d: Say) => Promise<void>;
   } = {};
 
   /** hooks wired by the game store */
   onRemoteAction: ((a: Action) => void) | null = null;
+  /** a line from someone else, or a notice — for the UI to make a sound */
+  onChat: ((m: ChatMsg) => void) | null = null;
   onStart: ((state: GameState) => void) | null = null;
   onSync: ((state: GameState) => void) | null = null;
   getState: (() => GameState | null) | null = null;
@@ -137,6 +160,15 @@ class Online {
     if (!seat) return 'computer';
     return seat.peer ? (this.peers[seat.peer] ?? seat.player) : `${seat.player} (away)`;
   }
+  /** first seat `peer` holds, or null for a spectator */
+  seatOf(peer: string): number | null {
+    const i = this.lobby?.seats.findIndex((s) => s.peer === peer) ?? -1;
+    return i >= 0 ? i : null;
+  }
+  /** what to call a peer: the name it said hello with, or a stand-in until it does */
+  private nameOf(peer: string): string {
+    return this.peers[peer] ?? 'someone';
+  }
 
   /* ------------------------------------------------------------ connect */
 
@@ -152,6 +184,8 @@ class Online {
       seed: makeCode(),
     };
     this.status = 'lobby';
+    this.rememberLobby();
+    this.sys(`Room ${code} is open. Share the code or the invite link.`);
   }
 
   join(code: string, playerName: string): void {
@@ -201,6 +235,7 @@ class Online {
     const act = mk<Act>('act');
     const sync = mk<Sync>('sync');
     const syncReq = mk<Hello>('syncreq');
+    const chat = mk<Say>('chat');
     this.send = {
       hello: hello.send,
       lobby: lobby.send,
@@ -209,6 +244,7 @@ class Online {
       act: act.send,
       sync: (d, o) => sync.send(d, o),
       syncReq: (d, o) => syncReq.send(d, o),
+      chat: chat.send,
     };
 
     room.onPeerJoin = (peerId) => {
@@ -222,7 +258,7 @@ class Online {
     };
     room.onPeerLeave = (peerId) => {
       const { [peerId]: _gone, ...rest } = this.peers;
-      void _gone;
+      if (_gone !== undefined) this.sys(`${_gone} left`);
       this.peers = rest;
       if (this.isHost && this.lobby) {
         // free the seat but remember the player name so they can reclaim it
@@ -237,6 +273,7 @@ class Online {
       }
     };
     hello.onMessage = (d, { peerId }) => {
+      if (!(peerId in this.peers) && this.status !== 'connecting') this.sys(`${d.name} joined`);
       this.peers = { ...this.peers, [peerId]: d.name };
       if (this.isHost && this.lobby) {
         // reconnecting player: rebind their old seat by player name
@@ -260,7 +297,11 @@ class Online {
       if (d.host !== peerId) return; // only the host owns the lobby
       this.joined();
       this.lobby = d;
-      if (this.status === 'connecting') this.status = 'lobby';
+      if (this.status === 'connecting') {
+        this.status = 'lobby';
+        this.sys(`Joined room ${this.code}. Take a seat, or wait for the host to start.`);
+      }
+      this.rememberLobby();
     };
     claim.onMessage = (d, { peerId }) => {
       if (!this.isHost || !this.lobby || this.status !== 'lobby') return;
@@ -280,16 +321,21 @@ class Online {
       this.status = 'playing';
       this.syncSettled();
       this.seq = d.seq;
+      this.rememberLobby();
+      this.sys('The game has started. Good luck!');
       this.onStart?.(d.state);
     };
     sync.onMessage = (d, { peerId }) => {
       if (d.lobby.host !== peerId) return;
       this.joined();
+      const fresh = this.status !== 'playing';
       this.lobby = d.lobby;
       this.status = 'playing';
       this.syncSettled();
       // adopt the host's counter with its state, or every later action would look like a gap
       this.seq = d.seq;
+      this.rememberLobby();
+      this.sys(fresh ? 'Back in the game.' : 'Caught up with the host.');
       this.onSync?.(d.state);
     };
     act.onMessage = (d, { peerId }) => {
@@ -316,6 +362,63 @@ class Online {
       const state = this.getState?.();
       if (state) sync.send({ state, lobby: this.lobby, seq: this.seq }, { target: peerId });
     };
+    chat.onMessage = (d, { peerId }) => {
+      // nobody has a name for us yet while we are still connecting, and the text is untrusted
+      if (this.status !== 'lobby' && this.status !== 'playing') return;
+      const text = sanitizeChat(d?.text);
+      if (!text || flooding(this.chatStamps, peerId, Date.now())) return;
+      this.push({
+        kind: 'say',
+        peer: peerId,
+        name: this.nameOf(peerId),
+        seat: this.seatOf(peerId),
+        text,
+      });
+    };
+  }
+
+  /* --------------------------------------------------------------- chat */
+
+  /** Say something to the room (`/1`…`/9` are the taunts). False when there was nothing to say. */
+  say(raw: string): boolean {
+    if (this.status !== 'lobby' && this.status !== 'playing') return false;
+    const text = sanitizeChat(expandTaunt(raw));
+    if (!text) return false;
+    this.push(
+      { kind: 'say', peer: selfId, name: this.myName, seat: this.seatOf(selfId), text },
+      true,
+    );
+    void this.send.chat?.({ text });
+    return true;
+  }
+
+  /** A notice from the room itself: joins, seats, settings, the game starting. */
+  private sys(text: string): void {
+    this.push({ kind: 'sys', peer: null, name: '', seat: null, text });
+  }
+
+  private push(m: Omit<ChatMsg, 'id' | 'at'>, mine = false): void {
+    // counted past whatever is there, so lines injected from outside (the layout audit) are safe
+    this.chatId = Math.max(this.chatId, this.chat.at(-1)?.id ?? 0) + 1;
+    const line: ChatMsg = { ...m, id: this.chatId, at: Date.now() };
+    this.chat = trimChat([...this.chat, line], CHAT_MAX);
+    if (mine) return;
+    // notices are ambient; the badge is for people talking
+    if (m.kind === 'say') this.chatUnread++;
+    this.onChat?.(line);
+  }
+
+  /** Note what the lobby looks like now, saying what changed since the last time. */
+  private rememberLobby(): void {
+    const next = this.lobby;
+    if (!next) {
+      this.lastLobby = null;
+      return;
+    }
+    const host = this.isHost ? 'You' : this.nameOf(next.host);
+    for (const line of lobbyChanges(this.lastLobby, next, (p) => this.nameOf(p), host))
+      this.sys(line);
+    this.lastLobby = { ...next, seats: next.seats.map((s) => ({ ...s })) };
   }
 
   /**
@@ -333,6 +436,7 @@ class Online {
     this.notice =
       `Could not connect to ${who} — their network may block direct connections. ` +
       `They can try joining again; everyone else is unaffected.`;
+    this.sys(this.notice);
   }
 
   /** the host has answered, so the join worked — stop the give-up timer */
@@ -353,6 +457,10 @@ class Online {
     this.notice = null;
     this.peerErrors = [];
     this.seq = 0;
+    this.chat = [];
+    this.chatUnread = 0;
+    this.chatStamps.clear();
+    this.lastLobby = null;
   }
 
   /* -------------------------------------------------------------- lobby */
@@ -360,6 +468,7 @@ class Online {
   private broadcastLobby(): void {
     if (this.lobby) {
       this.lobby = { ...this.lobby, seats: this.lobby.seats.map((s) => ({ ...s })) };
+      this.rememberLobby();
       void this.send.lobby?.(this.lobby);
     }
   }
@@ -433,6 +542,7 @@ class Online {
     if (!this.isHost || !this.lobby) return;
     this.status = 'playing';
     this.seq = 0;
+    this.sys('The game has started. Good luck!');
     void this.send.start?.({ state, lobby: this.lobby, seq: 0 });
   }
 

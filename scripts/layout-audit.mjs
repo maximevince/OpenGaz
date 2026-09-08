@@ -110,6 +110,30 @@ const PENDING = `
   opengaz.game.state = s2;
 `;
 
+/**
+ * An online room, faked in place: six seats, two peers, and a long chat of long lines.
+ * `opengaz.online` is the live store, so its public state can be set like any other.
+ */
+const ONLINE = `
+  const o = opengaz.online;
+  o.status = 'lobby'; o.code = 'ABC123'; o.myName = ${JSON.stringify(HUMANS[0])};
+  o.peers = { [o.selfId]: ${JSON.stringify(HUMANS[0])}, P2: 'Another Very Long Player Name' };
+  o.lobby = {
+    host: o.selfId,
+    seats: ${JSON.stringify(HUMANS)}.map((name, i) => ({
+      name: name + ' Interplanetary Gas Co.', ship: 1 + i, peer: i === 0 ? o.selfId : i === 1 ? 'P2' : null,
+      player: i < 2 ? name : '',
+    })),
+    ai: 1, level: 'novice', planets: null, seed: 'SEED',
+  };
+  o.chat = Array.from({ length: 60 }, (_, i) => ({
+    id: i, at: Date.now(), kind: i % 5 ? 'say' : 'sys', peer: 'P2', seat: i % 6,
+    name: 'Another Very Long Player Name',
+    text: 'A long line of chat about the price of nectum on a planet far away, number ' + i,
+  }));
+  o.chatUnread = 12;
+`;
+
 /** `go(screen)` covers most of them; the rest need a bit of state or a click first. */
 const SIMPLE_SCREENS = [
   'menu',
@@ -202,6 +226,23 @@ const scenarios = [
   {
     name: 'stock:buy-prompt',
     setup: `${BOOT}; opengaz.game.go('stock'); await $$tick(); await $$click('button', 'Buy');`,
+  },
+  // the online room: the lobby with its chat pane, the spectator screen, and the in-game
+  // overlay with the say-line open and with the history popup open
+  { name: 'lobby:room', setup: `${ONLINE}; opengaz.game.go('lobby')` },
+  {
+    name: 'waiting:chat',
+    setup: `${BOOT}; ${ONLINE}; o.status = 'playing'; opengaz.game.go('waiting')`,
+  },
+  {
+    name: 'menu:chat-say',
+    setup: `${BOOT}; ${ONLINE}; o.status = 'playing'; opengaz.game.go('menu'); await $$tick();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true }));`,
+  },
+  {
+    name: 'menu:chat-history',
+    setup: `${BOOT}; ${ONLINE}; o.status = 'playing'; opengaz.game.go('menu'); await $$tick();
+      await $$click('.bubble');`,
   },
 ];
 
