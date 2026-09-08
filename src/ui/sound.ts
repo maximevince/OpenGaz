@@ -137,6 +137,8 @@ const PRESETS: Record<string, Sound> = {
   click: [0.6, _, 1200, _, 0.01, 0.02, 1, 1.5, _, _, _, _, _, _, _, _, _, 0.6, 0.01],
   help: blip(980, 0, 0.45),
   ping: chime(880, 180, 0, 0.5),
+  /** a line of chat came in — quieter and shorter than a ping, so it never nags */
+  chat: blip(1320, 0, 0.35),
   select: chime(1180, 240, 1, 0.5),
   error: [0.9, _, 180, 0.02, 0.08, 0.16, 2, 0.8, _, _, _, _, _, 0.4, _, 0.2, _, 0.6, 0.04],
   unlock: chime(520, 420, 1, 0.7),

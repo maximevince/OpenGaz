@@ -3,7 +3,7 @@
  * and decides which screen is showing. All rules live in src/engine — this file only glues.
  */
 import { online } from '../net/online.svelte';
-import { play } from './sound';
+import { play, playingId } from './sound';
 import { currentTrack, setTrack } from './music';
 import { canPlotHistory } from './charts';
 import { ACTION_SOUND, eventSound, SCREEN_SOUND, tradeSound } from './soundmap';
@@ -110,6 +110,10 @@ class GameStore {
     online.onStart = (s) => this.adopt(s);
     online.onSync = (s) => this.adopt(s);
     online.getState = () => this.state;
+    // a chat line gets a small blip, unless a jingle or a sample is playing — it would cut it off
+    online.onChat = (m) => {
+      if (m.kind === 'say' && !playingId()) play('chat');
+    };
   }
 
   /** true when the local player may act for the current company */

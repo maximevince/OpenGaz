@@ -2,6 +2,7 @@
   import { PLANET_BY_ID, netWorth } from '../../engine';
   import { online } from '../../net/online.svelte';
   import Btn from '../components/Btn.svelte';
+  import ChatPanel from '../components/ChatPanel.svelte';
   import { fmt } from '../format';
   import { game } from '../game.svelte';
   const s = $derived(game.s);
@@ -23,8 +24,11 @@
         </div>
       {/each}
     </div>
-    <div class="log">
-      {#each recent as l, i (i)}<div class="l {l.kind}">wk {l.week}: {l.text}</div>{/each}
+    <div class="panes">
+      <div class="log">
+        {#each recent as l, i (i)}<div class="l {l.kind}">wk {l.week}: {l.text}</div>{/each}
+      </div>
+      <ChatPanel theme="dark" placeholder="Chat while you wait…" />
     </div>
     <div class="row">
       <Btn onclick={() => game.go('money')}>Money &amp; graphs</Btn>
@@ -50,7 +54,7 @@
     font: 13px var(--font-ui);
   }
   .box {
-    width: 560px;
+    width: 600px;
     text-align: center;
   }
   .small {
@@ -78,9 +82,14 @@
     background: #303070;
     font-weight: bold;
   }
+  .panes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    height: 130px;
+  }
   .log {
     text-align: left;
-    height: 120px;
     overflow: auto;
     background: #080818;
     border: 1px solid #404040;
